@@ -4,6 +4,7 @@ Estas decisiones reemplazan las recomendaciones anteriores que aparezcan en los 
 
 ## Reloj y métrica
 
+- `RhythmClock` de Dev 1 es la única fuente de verdad temporal para música y gameplay. El tiempo de cada pulso se deriva de `AudioContext.currentTime` y de un origen de audio común; temporizadores solo despiertan al planificador y nunca cuentan beats.
 - Duración de cada corchea: `60 / BPM / 3` segundos.
 - En esta convención, el BPM de cada pista se expresa en negras con puntillo: tres corcheas por pulso.
 - Cada compás tiene seis corcheas, índices `0–5`; los pulsos fuertes son `0` y `3`.
@@ -18,11 +19,13 @@ Estas decisiones reemplazan las recomendaciones anteriores que aparezcan en los 
 - La evaluación se hace respecto al slot válido más cercano: `PERFECT` (`±45 ms`) aplica el crítico; `GOOD` (`>45 ms` y `≤95 ms`) aplica bonus sin crítico; fuera de `±95 ms` es `MISS`. Los multiplicadores exactos se balancean en la configuración compartida.
 - Un `MISS` igualmente ejecuta el ataque, pero con daño muy reducido. El multiplicador de penalización queda por balancear en la configuración compartida.
 - El ataque requiere una pulsación nueva de `Space`: mantener la tecla presionada no repite ni carga ataques. Se rearma al soltarla.
+- La implementación de prueba usa `0.2x` como daño de `MISS`, solo como valor provisional para el prototipo.
 - La carga de la habilidad superior aumenta al dañar enemigos y destruir el escenario. No aumenta por acertar inputs sin causar ese daño/destrucción. Los valores por daño y por prop se balancean en `GameConfigs.json`.
 
 ## Habilidad superior y secciones
 
 - Cada sección musical dura ocho pulsos de negra con puntillo, equivalentes a cuatro compases de 6/8. El cambio ocurre en un límite de sección definido por el reloj común.
+- El reloj publica cada pulso con su `audioTime` objetivo, compás, corchea, acento y sección. La música se programa contra el mismo origen; gameplay y enemigos consumen esos eventos/tiempos y no implementan relojes propios.
 - `C` activa la habilidad superior cuando está disponible; no se dispara automáticamente al llenar la barra.
 - La habilidad superior cambia con la sección actual de la cueca (por ejemplo, Escobillado o Zapateo) y usa la variante correspondiente a esa sección al momento de activarla.
 - Cambiar de sección no vacía ni reinicia la carga acumulada.
@@ -45,6 +48,7 @@ Estas decisiones reemplazan las recomendaciones anteriores que aparezcan en los 
 ## Pendiente antes de integrar
 
 - Confirmar el punto de loop de la pista tradicional definitiva y validar que el track mantenga los `85 BPM` acordados.
+- Elegir el motor del juego y adaptar `RhythmClock` al reloj DSP nativo, conservándolo como dueño único del tiempo musical.
 - Acordar con Dev 3 los tres índices iniciales de ataque con referencia a la melodía y la telemetría de ataques enemigos; con Dev 2, el evento de daño/destrucción de elementos del escenario.
-- Definir en `src/core/` los eventos/payloads compartidos para pulsos, secciones, juicio de ataque, daño/destrucción, XP y carga de habilidad; acordar la semántica de pausa/reinicio.
+- Definir en `src/core/` el adaptador/eventos compartidos para `beatScheduled`, `beat`, `sectionScheduled`, `sectionChanged` y juicio de ataque, además de daño/destrucción, XP y carga de habilidad; acordar la semántica de pausa/reinicio.
 - Definir los multiplicadores de `GOOD`, `PERFECT` y `MISS`, la carga por daño/destrucción y las curvas de nivel en la configuración compartida.
