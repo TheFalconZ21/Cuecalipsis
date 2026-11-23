@@ -13,9 +13,11 @@ interface ScaleTierConfig {
 
 interface GameConfigShape {
   scaleTiers?: ScaleTierConfig[];
+  consumables?: Record<string, { growthMultiplier?: number; durationSeconds?: number }>;
 }
 
 const tierOneConfig = (gameConfigs as GameConfigShape).scaleTiers?.find(({ tier }) => tier === 1);
+const completoBuff = (gameConfigs as GameConfigShape).consumables?.['completo-italiano'];
 
 export interface ScaleManagerOptions {
   bus?: TypedEventBus<GameEvents>;
@@ -38,6 +40,8 @@ export class ScaleManager {
   private tier: TierIndex = 1;
   private capped = false;
   private scale: number = PROTOTYPE_DEFAULTS.minimumScale;
+  private growthMultiplier = 1;
+  private growthBuffSecondsRemaining = 0;
 
   constructor(options: ScaleManagerOptions = {}) {
     this.bus = options.bus ?? eventBus;
@@ -53,13 +57,19 @@ export class ScaleManager {
       this.bus.on('OnEnemyDestroyed', (payload) => this.gainApocalypse(payload.apocalypseReward, 'Enemy')),
       this.bus.on('OnPropTrampled', (payload) => this.gainApocalypse(payload.apocalypseGained, 'Prop')),
       this.bus.on('OnBossDefeated', (payload) => this.handleBossDefeated(payload.tier)),
+      this.bus.on('OnConsumableConsumed', ({ consumableId }) => this.handleConsumableConsumed(consumableId)),
       this.bus.on('OnGameReset', () => this.reset()),
+      this.bus.on('OnScaleTierChanged', () => this.clearGrowthBuff()),
+      this.bus.on('OnGameStateChanged', ({ current }) => {
+        if (current === 'MainMenu' || current === 'CharacterSelect' || current === 'Victory' || current === 'GameOver') this.clearGrowthBuff();
+      }),
     );
   }
 
   get currentTier(): TierIndex { return this.tier; }
   get currentApocalypse(): number { return this.apocalypse; }
-  get currentTotalScale(): number { return this.scale; }
+  get currentTotalScale(): number { return this.scale * this.growthMultiplier; }
+  get growthBuffRemainingSeconds(): number { return this.growthBuffSecondsRemaining; }
   get maxTierApocalypse(): number { return this.apocalypseThreshold; }
   get isScaleCapped(): boolean { return this.capped; }
 
@@ -72,7 +82,19 @@ export class ScaleManager {
     this.apocalypse = 0;
     this.capped = false;
     this.scale = this.minScale;
-    this.onScaleChanged?.(this.scale);
+    this.growthMultiplier = 1;
+    this.growthBuffSecondsRemaining = 0;
+    this.notifyScaleChanged();
+  }
+
+  /** Avanza la duración del buff temporal de consumibles. Llamar desde el ciclo de juego. */
+  update(deltaSeconds: number): void {
+    if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0 || this.growthBuffSecondsRemaining <= 0) return;
+    this.growthBuffSecondsRemaining = Math.max(0, this.growthBuffSecondsRemaining - deltaSeconds);
+    if (this.growthBuffSecondsRemaining === 0) {
+      this.growthMultiplier = 1;
+      this.notifyScaleChanged();
+    }
   }
 
   private gainApocalypse(amount: number, source: 'Enemy' | 'Prop'): void {
@@ -85,7 +107,7 @@ export class ScaleManager {
 
     const progress = this.apocalypse / this.apocalypseThreshold;
     this.scale = this.minScale + (this.maxScale - this.minScale) * progress;
-    this.onScaleChanged?.(this.scale);
+    this.notifyScaleChanged();
     this.bus.emit('OnApocalypseGained', {
       amount: gained,
       source,
@@ -106,7 +128,7 @@ export class ScaleManager {
     this.capped = false;
     this.apocalypse = 0;
     this.scale = this.minScale;
-    this.onScaleChanged?.(this.scale);
+    this.notifyScaleChanged();
 
     // Tier 2 data and its gate remain outside this Tier 1 reference prototype.
     if (previousTier < 4) {
@@ -114,9 +136,30 @@ export class ScaleManager {
       this.bus.emit('OnScaleTierChanged', {
         previousTier,
         newTier: this.tier,
-        totalScale: this.scale,
+        totalScale: this.currentTotalScale,
       });
     }
+  }
+
+  private handleConsumableConsumed(consumableId: string): void {
+    if (consumableId !== 'completo-italiano') return;
+    const multiplier = completoBuff?.growthMultiplier ?? 1.25;
+    const duration = completoBuff?.durationSeconds ?? 30;
+    if (!Number.isFinite(multiplier) || multiplier <= 1 || !Number.isFinite(duration) || duration <= 0) return;
+    this.growthMultiplier = multiplier;
+    this.growthBuffSecondsRemaining = duration;
+    this.notifyScaleChanged();
+  }
+
+  private clearGrowthBuff(): void {
+    if (this.growthMultiplier === 1 && this.growthBuffSecondsRemaining === 0) return;
+    this.growthMultiplier = 1;
+    this.growthBuffSecondsRemaining = 0;
+    this.notifyScaleChanged();
+  }
+
+  private notifyScaleChanged(): void {
+    this.onScaleChanged?.(this.currentTotalScale);
   }
 }
 

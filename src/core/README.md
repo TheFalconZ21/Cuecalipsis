@@ -16,4 +16,6 @@ Este espacio alojará los contratos compartidos (`EventBus`, tipos/interfaces de
 3. Esquema versionado de configuración, incluyendo personajes, escala, hordas, jefes y mejoras.
 4. Reglas de pausa/reinicio que mantengan sincronizados audio y simulación.
 
+`OnConsumableConsumed` publica `{ consumableId }` cuando el jugador termina de consumir un objeto. El módulo de escala escucha `completo-italiano` para activar su buff temporal; los emisores deben publicar el evento desde la acción real de consumo.
+
 Las ambigüedades de duración de corchea, Tiers y niveles de hordas están asignadas a los documentos `DECISIONS.md` de los roles responsables.

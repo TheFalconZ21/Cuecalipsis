@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { createCarabineroModel, createPatrullaAPieModel } from './modules/art-vfx-ui/LevelOneEnemyModels';
 import { createChileanCompletoModel } from './modules/art-vfx-ui/ChileanCompletoModel';
+import { createChileanEmpanadaModel, createChileanSopaipillaModel } from './modules/art-vfx-ui/ChileanStreetFoodModels';
+import { createSunModel } from './modules/art-vfx-ui/SunModel';
 import './models-preview.css';
 
 const container = document.querySelector<HTMLElement>('#preview');
@@ -12,7 +14,7 @@ scene.fog = new THREE.Fog('#17120f', 10, 24);
 
 const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 60);
 const cameraTarget = new THREE.Vector3(0, 0.92, 0);
-let cameraRadius = 12.8;
+let cameraRadius = 15.5;
 let cameraAzimuth = 0.51;
 let cameraPolar = 1.28;
 
@@ -43,7 +45,7 @@ keyLight.shadow.mapSize.set(1024, 1024);
 scene.add(keyLight);
 
 const floor = new THREE.Mesh(
-  new THREE.CircleGeometry(6, 40),
+  new THREE.CircleGeometry(8, 48),
   new THREE.MeshStandardMaterial({ color: '#302820', roughness: 1, flatShading: true }),
 );
 floor.rotation.x = -Math.PI / 2;
@@ -51,7 +53,7 @@ floor.position.y = -0.015;
 floor.receiveShadow = true;
 scene.add(floor);
 
-const grid = new THREE.GridHelper(12, 24, '#75614b', '#493c30');
+const grid = new THREE.GridHelper(16, 32, '#75614b', '#493c30');
 grid.position.y = 0.006;
 scene.add(grid);
 
@@ -66,9 +68,24 @@ patrol.rotation.y = -0.15;
 scene.add(patrol);
 
 const completo = createChileanCompletoModel();
-completo.position.x = -2.7;
+completo.position.x = -5.4;
 completo.rotation.y = -0.22;
 scene.add(completo);
+
+const sun = createSunModel();
+sun.position.x = -2.7;
+sun.position.y = 1.32;
+scene.add(sun);
+
+const empanada = createChileanEmpanadaModel();
+empanada.position.x = 2.7;
+empanada.rotation.y = -0.28;
+scene.add(empanada);
+
+const sopaipilla = createChileanSopaipillaModel();
+sopaipilla.position.x = 5.4;
+sopaipilla.rotation.y = 0.18;
+scene.add(sopaipilla);
 
 let dragging = false;
 let lastPointerX = 0;

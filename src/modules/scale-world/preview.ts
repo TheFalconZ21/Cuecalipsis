@@ -11,6 +11,7 @@ import { WorldStageController } from './WorldStageController';
 
 const viewport = requireElement<HTMLDivElement>('viewport');
 const scaleValue = requireElement<HTMLElement>('scale-value');
+const growthBuffStatus = requireElement<HTMLElement>('growth-buff-status');
 const apocalypseValue = requireElement<HTMLElement>('apocalypse-value');
 const progressFill = requireElement<HTMLDivElement>('progress-fill');
 const gateStatus = requireElement<HTMLDivElement>('gate-status');
@@ -18,6 +19,7 @@ const statusMessage = requireElement<HTMLParagraphElement>('status-message');
 const tierBadge = requireElement<HTMLSpanElement>('tier-badge');
 const toastMessage = requireElement<HTMLElement>('toast-message');
 const enemyButton = requireElement<HTMLButtonElement>('enemy-button');
+const completoButton = requireElement<HTMLButtonElement>('completo-button');
 const beatButton = requireElement<HTMLButtonElement>('beat-button');
 const bossButton = requireElement<HTMLButtonElement>('boss-button');
 const resetButton = requireElement<HTMLButtonElement>('reset-button');
@@ -81,6 +83,10 @@ let disposed = false;
 function updateHud(): void {
   const progress = scaleManager.currentApocalypse / scaleManager.maxTierApocalypse;
   scaleValue.textContent = `${scaleManager.currentTotalScale.toFixed(2)}×`;
+  const buffSeconds = scaleManager.growthBuffRemainingSeconds;
+  growthBuffStatus.textContent = buffSeconds > 0
+    ? `Completo italiano · ${(buffSeconds / 60).toFixed(1)} min restantes`
+    : 'Sin buff de crecimiento';
   apocalypseValue.textContent = `${Math.floor(scaleManager.currentApocalypse)} / ${scaleManager.maxTierApocalypse}`;
   progressFill.style.width = `${Math.min(100, progress * 100)}%`;
   tierBadge.textContent = `TIER ${scaleManager.currentTier}`;
@@ -124,6 +130,13 @@ function emitStrongBeat(): void {
   showToast('Pulso fuerte · micro-pulso de cámara');
 }
 
+function consumeCompleto(): void {
+  eventBus.emit('OnConsumableConsumed', { consumableId: 'completo-italiano' });
+  statusMessage.textContent = '¡Completo italiano comido! Crecimiento ×1,5 activo durante 3 minutos.';
+  showToast('Buff de crecimiento activado · 3 minutos');
+  updateHud();
+}
+
 function defeatPreviewBoss(): void {
   if (!scaleManager.isScaleCapped) return;
   const defeatedTier = scaleManager.currentTier;
@@ -165,6 +178,7 @@ function renderFrame(timeMs: number): void {
   elapsedSeconds = currentSeconds;
 
   movePreviewPlayer(deltaSeconds);
+  scaleManager.update(deltaSeconds);
   tramplingSystem.update(deltaSeconds);
   cameraController.update(deltaSeconds);
   updateHud();
@@ -189,6 +203,7 @@ const unsubscribers: Unsubscribe[] = [
 ];
 
 enemyButton.addEventListener('click', emitEnemyDestroyed);
+completoButton.addEventListener('click', consumeCompleto);
 beatButton.addEventListener('click', emitStrongBeat);
 bossButton.addEventListener('click', defeatPreviewBoss);
 resetButton.addEventListener('click', resetPreview);
