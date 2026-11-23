@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#17120f" />
+    <title>Cuecalipsis · Fuerza pública</title>
+  </head>
+  <body>
+    <main class="combat-shell">
+      <div id="viewport" class="viewport" aria-label="Prototipo jugable de combate"></div>
+      <header class="topbar glass-panel">
+        <div class="brand-mark">C</div>
+        <div><p class="eyebrow">DEV 3 · COMBATE</p><h1>Fuerza pública <span>Horda 1</span></h1></div>
+        <div class="live-pill"><i></i> PROTOTIPO JUGABLE</div>
+      </header>
+      <aside class="combat-panel glass-panel">
+        <p class="eyebrow">SUPERVIVENCIA</p>
+        <h2 id="wave-label">Oleada 1</h2>
+        <p id="wave-count" class="wave-count">Enemigos 0 / 3</p>
+        <div class="health-label"><span>Salud</span><strong id="health-value">100%</strong></div>
+        <div class="health-track"><div id="health-fill"></div></div>
+        <p id="status" class="status">Muévete, esquiva y baila para despejar la plaza.</p>
+        <button id="restart" class="restart" type="button">Reiniciar partida</button>
+      </aside>
+      <footer class="controls glass-panel">
+        <span><kbd>W A S D</kbd> moverse</span><span><kbd>ESPACIO</kbd> zapatear y atacar</span><span><kbd>SHIFT</kbd> esquivar</span>
+        <span id="rhythm-note" class="rhythm-note">Disparos cada pocos segundos · ritmo musical pendiente</span>
+      </footer>
+      <div id="toast" class="toast" aria-live="polite"></div>
+    </main>
+    <script type="module" src="./preview.ts"></script>
+  </body>
+</html>
