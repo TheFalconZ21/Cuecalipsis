@@ -30,6 +30,9 @@ export class DynamicCameraController {
   private readonly target = new THREE.Vector3();
   private readonly desiredPosition = new THREE.Vector3();
   private readonly playerWorldPosition = new THREE.Vector3();
+  private readonly previousPlayerPosition = new THREE.Vector3();
+  private readonly playerVelocity = new THREE.Vector3();
+  private readonly smoothedPlayerVelocity = new THREE.Vector3();
   private readonly currentOccluders = new Set<THREE.Object3D>();
   private readonly nextOccluders = new Set<THREE.Object3D>();
   private readonly materialSnapshots = new Map<THREE.Object3D, MaterialSnapshot>();
@@ -40,6 +43,7 @@ export class DynamicCameraController {
   private readonly followSharpness = PROTOTYPE_DEFAULTS.cameraFollowSharpness;
   private readonly pitchRadians = THREE.MathUtils.degToRad(PROTOTYPE_DEFAULTS.cameraPitchDegrees);
   private pulseRemaining = 0;
+  private hasPreviousPlayerPosition = false;
   private disposed = false;
 
   constructor(options: DynamicCameraOptions) {
@@ -61,6 +65,16 @@ export class DynamicCameraController {
     if (this.disposed || !Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return;
 
     this.player.getWorldPosition(this.playerWorldPosition);
+    if (this.hasPreviousPlayerPosition) {
+      this.playerVelocity.subVectors(this.playerWorldPosition, this.previousPlayerPosition);
+      this.playerVelocity.y = 0;
+      this.playerVelocity.divideScalar(deltaSeconds);
+      const velocityAlpha = 1 - Math.exp(-PROTOTYPE_DEFAULTS.cameraVelocitySmoothing * deltaSeconds);
+      this.smoothedPlayerVelocity.lerp(this.playerVelocity, velocityAlpha);
+    } else {
+      this.hasPreviousPlayerPosition = true;
+    }
+
     const scale = Math.max(0.01, this.getPlayerScale());
     const playerHeight = this.playerHeightAtScaleOne * scale;
     const halfFovTangent = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2);
@@ -78,6 +92,13 @@ export class DynamicCameraController {
       this.playerWorldPosition.y + playerHeight * 0.52,
       this.playerWorldPosition.z,
     );
+    const lookAhead = Math.min(
+      PROTOTYPE_DEFAULTS.cameraLookAheadMaxDistance,
+      this.smoothedPlayerVelocity.length() * PROTOTYPE_DEFAULTS.cameraLookAheadSeconds,
+    );
+    if (lookAhead > 0.001) {
+      this.target.addScaledVector(this.smoothedPlayerVelocity.normalize(), lookAhead);
+    }
     this.desiredPosition.set(
       this.target.x,
       this.target.y + height,
@@ -87,6 +108,7 @@ export class DynamicCameraController {
     this.camera.position.lerp(this.desiredPosition, interpolation);
     this.camera.lookAt(this.target);
     this.updateOcclusion();
+    this.previousPlayerPosition.copy(this.playerWorldPosition);
   }
 
   dispose(): void {

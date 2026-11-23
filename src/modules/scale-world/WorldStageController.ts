@@ -65,6 +65,8 @@ export class WorldStageController {
 
     this.addPavingRing(1.25, 0.045, '#ad4d38');
     this.addPavingRing(1.48, 0.035, '#3e7181');
+    this.addPavingRing(3.35, 0.035, '#78644a');
+    this.addDanceMarkers();
   }
 
   private createWayfinding(): void {
@@ -92,6 +94,18 @@ export class WorldStageController {
     ring.rotation.x = Math.PI / 2;
     ring.position.y = 0.055;
     this.addOwned(geometry, ring);
+  }
+
+  private addDanceMarkers(): void {
+    const markerColors = ['#ad4d38', '#d7bd91', '#3e7181', '#d7bd91'];
+    for (let index = 0; index < markerColors.length; index += 1) {
+      const angle = (index / markerColors.length) * Math.PI * 2;
+      const geometry = new THREE.BoxGeometry(0.72, 0.035, 0.24);
+      const marker = new THREE.Mesh(geometry, this.material(markerColors[index]));
+      marker.position.set(Math.cos(angle) * 2.55, 0.055, Math.sin(angle) * 2.55);
+      marker.rotation.y = -angle;
+      this.addOwned(geometry, marker);
+    }
   }
 
   private addPavingStrip(id: string, width: number, length: number, x: number, z: number, color: string, rotation = 0): void {

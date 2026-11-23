@@ -10,7 +10,7 @@ El módulo contiene una referencia procedural acotada de Pueblo/Ciudad: `WorldSt
 
 El host del juego crea estas piezas y llama `trampling.update(deltaSeconds)` y `camera.update(deltaSeconds)` desde su ciclo de render. `ScaleManager` es la fuente de escala y recibe `OnEnemyDestroyed`, `OnPropTrampled`, `OnBossDefeated` y `OnGameReset` por `EventBus`. `TramplingSystem` usa comprobaciones XZ y empuja suavemente los objetos que aún superan la escala del jugador. La cámara consulta la escala mediante `getPlayerScale`, así evita duplicar estado.
 
-La cámara apunta al centro del cuerpo y excluye al jugador de la oclusión para mantenerlo legible. El escenario marca el punto inicial con anillos de color cueca, despeja la plaza y usa caminos anchos como guía. `constrainToArena` expone el borde del graybox para que el host limite el movimiento sin transferir su propiedad a Dev 2; la vista de prueba lo usa para no perder al personaje fuera de la arena.
+La cámara apunta al centro del cuerpo y excluye al jugador de la oclusión para mantenerlo legible. Anticipa levemente su desplazamiento con un seguimiento suavizado, de modo que las trayectorias curvas no empujen al huaso contra el borde del encuadre. El escenario marca el punto inicial con anillos y cuatro hitos de color cueca, despeja un espacio para las figuras y usa caminos anchos como guía. `constrainToArena` expone el borde del graybox para que el host limite el movimiento sin transferir su propiedad a Dev 2; la vista de prueba lo usa para no perder al personaje fuera de la arena.
 
 Ejemplo de montaje en el host (la integración con `src/main.ts` queda fuera del módulo Dev 2):
 
