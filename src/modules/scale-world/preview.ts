@@ -155,6 +155,7 @@ function movePreviewPlayer(deltaSeconds: number): void {
   const speed = 6 * Math.sqrt(scaleManager.currentTotalScale);
   player.position.addScaledVector(movement, speed * deltaSeconds);
   player.position.y = 0;
+  stage.constrainToArena(player.position, PROTOTYPE_DEFAULTS.playerRadiusAtScaleOne * scaleManager.currentTotalScale);
 }
 
 function renderFrame(timeMs: number): void {
