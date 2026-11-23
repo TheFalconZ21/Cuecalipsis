@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "decisionStatus": {
+    "rhythmBpmConvention": "pending-dev1",
+    "tierThresholdsAndBossGates": "pending-dev2",
+    "hordeToTierMapping": "pending-dev2-and-dev3",
+    "valuesBelowAreStartingProposals": true
+  },
+  "characters": [
+    { "id": "huaso-mc", "name": "Huaso MC", "archetype": "Hip Hop", "bpm": 100, "track": "assets/audio/huaso-mc.ogg", "enjundiaMultiplier": 1.0 },
+    { "id": "huaso-tech", "name": "Huaso Tech", "archetype": "Electrónica", "bpm": 126, "track": "assets/audio/huaso-tech.ogg", "enjundiaMultiplier": 1.0 },
+    { "id": "huaso-tradicional", "name": "Huaso Tradicional", "archetype": "Cueca", "bpm": 138, "track": "assets/audio/huaso-tradicional.ogg", "enjundiaMultiplier": 1.0 },
+    { "id": "huaso-metalero", "name": "Huaso Metalero", "archetype": "Metal", "bpm": 165, "track": "assets/audio/huaso-metalero.ogg", "enjundiaMultiplier": 1.0 },
+    { "id": "huaso-otaku", "name": "Huaso Otaku", "archetype": "Nightcore", "bpm": 182, "track": "assets/audio/huaso-otaku.ogg", "enjundiaMultiplier": 1.0 }
+  ],
+  "rhythm": { "meter": "6/8", "subdivisionsPerBar": 6, "strongSubdivisions": [0, 3], "bpmConvention": null, "audioOffsetMs": 0, "judgementWindowsMs": { "perfect": 45, "good": 95 }, "missCooldownSeconds": 0.25 },
+  "scaleTiers": [
+    { "tier": 1, "name": "Pueblo/Ciudad", "minScale": 1.0, "maxScale": 4.5, "maxTierApocalypse": null, "cameraDistance": null, "cameraFov": null, "speedFactor": null, "decisionPending": true },
+    { "tier": 2, "name": "Metrópoli/Rascacielos", "minScale": 1.0, "maxScale": 4.5, "maxTierApocalypse": null, "cameraDistance": null, "cameraFov": null, "speedFactor": null, "decisionPending": true },
+    { "tier": 3, "name": "Continental", "minScale": 1.0, "maxScale": 4.5, "maxTierApocalypse": null, "cameraDistance": null, "cameraFov": null, "speedFactor": null, "decisionPending": true },
+    { "tier": 4, "name": "Planetario/Cósmico", "minScale": 1.0, "maxScale": 4.5, "maxTierApocalypse": null, "cameraDistance": null, "cameraFov": null, "speedFactor": null, "decisionPending": true }
+  ],
+  "hordeWaves": [
+    { "level": 1, "name": "Fuerza pública", "enemies": ["Carabineros", "patrullas a pie"], "maxHealth": null, "speed": null, "fireCadenceStrongBeats": null, "apocalypseReward": null },
+    { "level": 2, "name": "Control antidisturbios", "enemies": ["GOPE", "blindados ligeros", "helicópteros"], "maxHealth": null, "speed": null, "fireCadenceStrongBeats": null, "apocalypseReward": null },
+    { "level": 3, "name": "Ejército", "enemies": ["infantería", "tanques Leopard"], "maxHealth": null, "speed": null, "fireCadenceStrongBeats": null, "apocalypseReward": null },
+    { "level": 4, "name": "Defensa estratégica", "enemies": ["drones", "cazas", "misiles crucero"], "maxHealth": null, "speed": null, "fireCadenceStrongBeats": null, "apocalypseReward": null },
+    { "level": 5, "name": "Corte celestial", "enemies": ["querubines cuequeros", "arcángeles", "deidades celestiales"], "maxHealth": null, "speed": null, "fireCadenceStrongBeats": null, "apocalypseReward": null }
+  ],
+  "bosses": [
+    { "id": "guaton-loyola", "name": "El Guatón Loyola", "tier": null, "maxHealth": null, "speed": null, "fireCadenceStrongBeats": null, "apocalypseReward": null, "decisionPending": true },
+    { "id": "la-consentida", "name": "La Consentida", "tier": null, "maxHealth": null, "speed": null, "fireCadenceStrongBeats": null, "apocalypseReward": null, "decisionPending": true },
+    { "id": "fabi-dios-cueca", "name": "Fabi, el Dios de la Cueca", "tier": null, "maxHealth": null, "speed": null, "fireCadenceStrongBeats": null, "apocalypseReward": null, "decisionPending": true }
+  ],
+  "upgrades": [
+    { "id": "panuelos-orbitales", "name": "Pañuelos Orbitales Cortantes", "description": "Pañuelos que orbitan y cortan.", "statsByLevel": [null, null, null, null, null], "synergyWith": "chupalla-boomeran" },
+    { "id": "chupalla-boomeran", "name": "Chupalla Búmeran", "description": "Chupalla arrojadiza que regresa.", "statsByLevel": [null, null, null, null, null], "synergyWith": "panuelos-orbitales" },
+    { "id": "lluvia-empanadas", "name": "Lluvia de Empanadas Explosivas", "description": "Empanadas explosivas caen sobre la horda.", "statsByLevel": [null, null, null, null, null], "synergyWith": "ondas-pandero" },
+    { "id": "ondas-pandero", "name": "Ondas de Pandero", "description": "Ondas de choque en los pulsos fuertes.", "statsByLevel": [null, null, null, null, null], "synergyWith": "lluvia-empanadas" },
+    { "id": "espuelas-relampago", "name": "Espuelas Relámpago", "description": "Descargas automáticas sincronizadas al pulso.", "statsByLevel": [null, null, null, null, null], "synergyWith": null }
+  ],
+  "poolCapacities": { "enemyProjectiles": 600, "playerProjectiles": 200, "enemies": 150, "apocalypseOrbs": 100 },
+  "audio": { "maxRepeatedSfxInstances": 5, "windowMs": 80, "pitchRange": [0.95, 1.05] },
+  "consumables": {
+    "completo-italiano": { "growthMultiplier": 1.25, "durationSeconds": 30 }
+  }
+}

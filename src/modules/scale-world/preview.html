@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#17120f" />
+    <title>Cuecalipsis · Vista de Dev 2</title>
+  </head>
+  <body>
+    <main class="preview-shell">
+      <div id="viewport" class="viewport" aria-label="Vista 3D del Tier 1"></div>
+
+      <header class="topbar glass-panel">
+        <div class="brand-mark" aria-hidden="true">C</div>
+        <div>
+          <p class="eyebrow">DEV 2 · SCALE &amp; WORLD</p>
+          <h1>Pueblo / Ciudad <span>Tier 1</span></h1>
+        </div>
+        <div class="live-pill"><i></i> PROTOTIPO EN VIVO</div>
+      </header>
+
+      <aside class="status-panel glass-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">PROGRESIÓN</p>
+            <h2>Apocalipsis</h2>
+          </div>
+          <span id="tier-badge" class="tier-badge">TIER 1</span>
+        </div>
+        <div class="scale-readout"><strong id="scale-value">1.00×</strong><span>escala total</span></div>
+        <p id="growth-buff-status" class="growth-buff-status" aria-live="polite">Sin buff de crecimiento</p>
+        <div class="progress-track"><div id="progress-fill" class="progress-fill"></div></div>
+        <div class="progress-caption"><span id="apocalypse-value">0 / 100</span><span>umbral prototipo</span></div>
+        <div id="gate-status" class="gate-status"><span class="gate-dot"></span><span>Jefe guardián bloqueado</span></div>
+        <div class="divider"></div>
+        <p class="eyebrow section-label">ESTADO</p>
+        <p id="status-message" class="status-message">Recorre la plaza y prueba el escenario.</p>
+        <ul class="legend">
+          <li><i class="swatch swatch-table"></i>Mesas destructibles</li>
+          <li><i class="swatch swatch-fence"></i>Cercas destructibles</li>
+          <li><i class="swatch swatch-block"></i>Bloques de oclusión</li>
+        </ul>
+      </aside>
+
+      <section class="action-panel glass-panel" aria-label="Controles de prototipo">
+        <div class="panel-heading compact-heading">
+          <div><p class="eyebrow">SIMULACIÓN</p><h2>Prueba el bucle</h2></div>
+          <span class="dev-tag">SOLO PREVIEW</span>
+        </div>
+        <div class="actions-grid">
+          <button id="enemy-button" class="action-button primary-button" type="button"><span class="button-icon">＋</span><span>Destruir enemigo<small>+12 Apocalipsis</small></span></button>
+          <button id="completo-button" class="action-button" type="button"><span class="button-icon">🥑</span><span>Comer completo<small>Crece 1,5× durante 3 min</small></span></button>
+          <button id="beat-button" class="action-button" type="button"><span class="button-icon beat-icon">◉</span><span>Pulso fuerte<small>Prueba respuesta de cámara</small></span></button>
+          <button id="boss-button" class="action-button boss-button" type="button" disabled><span class="button-icon">✦</span><span>Derrotar guardián<small>Se habilita al llenar la barra</small></span></button>
+          <button id="reset-button" class="action-button reset-button" type="button"><span class="button-icon">↺</span><span>Reiniciar Tier 1<small>Restaura props y progreso</small></span></button>
+        </div>
+        <p class="movement-hint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> o flechas para moverte <span>·</span> Pisa objetos para probar el aplastamiento</p>
+      </section>
+
+      <div class="toast glass-panel" aria-live="polite"><span class="toast-dot"></span><span id="toast-message">Vista local de desarrollo lista</span></div>
+      <div class="corner-note">Los valores de balance son temporales y están en <code>PROTOTYPE_DEFAULTS</code>.</div>
+    </main>
+    <script type="module" src="./preview.ts"></script>
+  </body>
+</html>
