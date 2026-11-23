@@ -28,9 +28,9 @@ export const HORDE_BALANCE = {
   completoScaleMultiplier: 1.25,
   completoDamageReduction: 0.25,
   foodBuffDurationSeconds: 30,
-  foodBaseDropChance: 0.035,
-  foodDropChanceStep: 0.025,
-  foodDropChanceMaximum: 0.2,
+  foodBaseDropChance: 0.1,
+  foodDropChanceStep: 0.05,
+  foodDropChanceMaximum: 0.3,
   growthPerOfficerKill: 0.01,
   resistancePerOfficerKill: 0.015,
   permanentResistanceMaximum: 0.3,
@@ -132,6 +132,7 @@ export class HordeDirector {
   private breakTimer = 0;
   private alive = 0;
   private complete = false;
+  private stopped = false;
 
   constructor(private readonly onSpawn: (kind: LevelOneEnemyKind) => void) {
     variantBag.length = 0;
@@ -139,7 +140,7 @@ export class HordeDirector {
 
   update(deltaSeconds: number, alive: number): void {
     this.alive = alive;
-    if (this.complete) return;
+    if (this.complete || this.stopped) return;
     const total = this.waveCount;
     if (this.spawned >= total && alive === 0) {
       if (this.wave >= HORDE_BALANCE.maximumWaveCount) {
@@ -185,12 +186,19 @@ export class HordeDirector {
   }
 
   finish(): void {
-    this.complete = true;
+    this.stopped = true;
   }
 
-  onOfficerDefeated(): void {
+  onOfficerDefeated(alive: number): void {
+    this.alive = Math.max(0, alive);
     this.defeated = Math.min(HORDE_BALANCE.firstWaveCount, this.defeated + 1);
     this.spawnTimer = 0;
+    if (
+      this.wave >= HORDE_BALANCE.maximumWaveCount
+      && this.spawned >= this.waveCount
+      && this.defeated >= this.waveCount
+      && this.alive === 0
+    ) this.complete = true;
   }
 
   private spawnNext(): void {

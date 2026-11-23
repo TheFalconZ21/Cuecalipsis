@@ -6,6 +6,9 @@ import type { CuecaStep, UpgradeChoice, Vector2XZ } from '../../core/GameContrac
 import type { LevelOneEnemyKind } from './HordeLevelOne';
 import { HordeLevelOne } from './HordeLevelOne';
 import { HORDE_BALANCE, HordeDirector } from './HordeDirector';
+import { createChileanCompletoModel } from '../art-vfx-ui/ChileanCompletoModel';
+import { createChileanEmpanadaModel, createChileanSopaipillaModel } from '../art-vfx-ui/ChileanStreetFoodModels';
+import { createSunModel } from '../art-vfx-ui/SunModel';
 
 const viewport = required<HTMLDivElement>('viewport');
 const waveLabel = required<HTMLElement>('wave-label');
@@ -27,10 +30,17 @@ const upgradeChoices = required<HTMLDivElement>('upgrade-choices');
 const status = required<HTMLElement>('status');
 const toast = required<HTMLElement>('toast');
 const rhythmNote = required<HTMLElement>('rhythm-note');
+const sunRhythmOverlay = required<HTMLElement>('sun-rhythm-overlay');
+const rhythmNotes = required<HTMLDivElement>('rhythm-notes');
+const rhythmLane = required<HTMLDivElement>('rhythm-lane');
+const rhythmFeedback = required<HTMLElement>('rhythm-feedback');
+const sunScoreLabel = required<HTMLElement>('sun-score');
+const sunHealthFill = required<HTMLElement>('sun-health-fill');
 
 const scene = new THREE.Scene();
-const enemyHealthFullColor = new THREE.Color('#d45c45');
-const enemyHealthEmptyColor = new THREE.Color('#211a18');
+const enemyHealthFullColor = new THREE.Color('#ff3027');
+const enemyHealthEmptyColor = new THREE.Color('#171313');
+const foodGlowTexture = createFoodGlowTexture();
 scene.background = new THREE.Color('#17120f');
 scene.fog = new THREE.Fog('#17120f', 28, 54);
 const camera = new THREE.PerspectiveCamera(48, innerWidth / innerHeight, 0.1, 90);
@@ -51,6 +61,12 @@ createArena();
 const huasoRig = createHuaso();
 const player = huasoRig.root;
 scene.add(player);
+const sunEncounter = createSunModel();
+sunEncounter.position.set(0, 12, -2);
+sunEncounter.rotation.y = Math.PI;
+sunEncounter.scale.setScalar(2.35);
+sunEncounter.visible = false;
+scene.add(sunEncounter);
 const keys = new Set<string>();
 const enemyViews = new Map<string, EnemyView>();
 const projectiles: Projectile[] = [];
@@ -111,6 +127,7 @@ let playerLevel = 1;
 let experience = 0;
 let foodDropChance: number = HORDE_BALANCE.foodBaseDropChance;
 let everDroppedFood = false;
+let hasCompleteAppeared = false;
 let completoSeconds = 0;
 let empanadaSeconds = 0;
 let skillCharge = 0;
@@ -143,6 +160,17 @@ let toastTimer = 0;
 let requestId = 0;
 let director = new HordeDirector(spawnEnemy);
 let disposed = false;
+let sunPhase = false;
+let sunPhaseWon = false;
+let sunEncounterStarted = false;
+let sunEntrance = 0;
+let rhythmStartedAt = 0;
+let rhythmHits = 0;
+let rhythmResolved = 0;
+const rhythmOrbElements: HTMLDivElement[] = [];
+const RHYTHM_BEAT_MS = 720; // provisional until connected to RhythmClock / final BPM
+const RHYTHM_APPROACH_MS = 2200;
+const RHYTHM_NOTE_COUNT = 8;
 configureHordeBuffs();
 const unsubscribers: Unsubscribe[] = [
   eventBus.on('OnEnemyDestroyed', ({ enemyId }) => {
@@ -151,12 +179,12 @@ const unsubscribers: Unsubscribe[] = [
     scene.remove(view.root);
     disposeObject(view.root);
     enemyViews.delete(enemyId);
-    director.onOfficerDefeated();
+    director.onOfficerDefeated(enemyViews.size);
     growthStacks += 1;
     updatePlayerGrowthVisual();
     grantExperience(HORDE_BALANCE.experiencePerEnemy);
-    maybeDropFood(enemyId, view.root.position);
     showToast(`Enemigo derribado · tamaño +${Math.round(growthStacks * HORDE_BALANCE.growthPerOfficerKill * 100)}% · resistencia +${Math.round(growthStacks * HORDE_BALANCE.resistancePerOfficerKill * 100)}%`);
+    maybeDropFood(enemyId, view.root.position);
   }),
   eventBus.on('OnEnemyDamaged', ({ enemyId, source, remainingHealth }) => {
     const view = enemyViews.get(enemyId);
@@ -167,7 +195,6 @@ const unsubscribers: Unsubscribe[] = [
       view.infectionSeconds = HORDE_BALANCE.zombieInfectionDurationSeconds;
       view.infectionTick = HORDE_BALANCE.zombieInfectionTickSeconds;
       view.infected = true;
-      view.healthFill.material.color.set('#91d07b');
     }
     if (acquiredSongBuffs.has('rin-rin-raja') && rinRinCooldown <= 0 && source.startsWith('BasicStep:') && isBehindOfficer(view)) {
       rinRinSeconds = HORDE_BALANCE.rinRinBuffDurationSeconds;
@@ -206,6 +233,7 @@ const unsubscribers: Unsubscribe[] = [
     if (reason !== 'LevelUp') return;
     levelUpPaused = paused;
     levelUpOverlay.hidden = !paused;
+    if (paused) upgradeChoices.querySelector<HTMLButtonElement>('button[data-upgrade]:not(:disabled)')?.focus();
   }),
   eventBus.on('OnScaleTierChanged', () => clearBuffs()),
   eventBus.on('OnGameStateChanged', ({ current }) => {
@@ -221,6 +249,9 @@ if (HORDE_BALANCE.rhythm.source === 'strong-beat') {
 }
 
 document.getElementById('restart')?.addEventListener('click', resetRun);
+document.getElementById('rhythm-hit')?.addEventListener('click', hitRhythmNote);
+document.getElementById('rhythm-retry')?.addEventListener('click', beginSunPhase);
+rhythmLane.addEventListener('pointerdown', hitRhythmNote);
 upgradeChoices.addEventListener('click', handleUpgradeChoiceClick);
 window.addEventListener('keydown', onKeyDown);
 window.addEventListener('keyup', (event) => keys.delete(event.code));
@@ -249,7 +280,7 @@ interface EnemyView {
 }
 interface Projectile { mesh: THREE.Mesh; velocity: THREE.Vector3; damage: number }
 type FoodKind = 'completo' | 'sopaipilla' | 'empanada';
-interface FoodPickup { root: THREE.Group; kind: FoodKind }
+interface FoodPickup { root: THREE.Group; kind: FoodKind; availableAt: number; glow: THREE.Sprite }
 interface ZombieAlly { root: THREE.Group; health: number; attackCooldown: number }
 interface MeteorStrike { mesh: THREE.Mesh; position: Vector2XZ; elapsed: number; impacted: boolean }
 
@@ -276,7 +307,7 @@ function spawnEnemy(kind: LevelOneEnemyKind): void {
   );
   const healthFill = new THREE.Mesh(
     new THREE.PlaneGeometry(0.96, 0.075),
-    new THREE.MeshBasicMaterial({ color: '#d45c45', depthTest: false, depthWrite: false }),
+    new THREE.MeshBasicMaterial({ color: enemyHealthFullColor, depthTest: false, depthWrite: false }),
   );
   healthFill.position.z = 0.008;
   healthBar.add(healthBack, healthFill);
@@ -293,14 +324,14 @@ function updateEnemyHealthBar(view: EnemyView, remainingHealth: number): void {
   const ratio = Math.max(0, Math.min(1, remainingHealth / view.maxHealth));
   view.healthFill.scale.x = ratio;
   view.healthFill.position.x = -0.48 * (1 - ratio);
-  if (!view.infected) view.healthFill.material.color.lerpColors(enemyHealthEmptyColor, enemyHealthFullColor, ratio);
+  view.healthFill.material.color.lerpColors(enemyHealthEmptyColor, enemyHealthFullColor, ratio);
 }
 
 function frame(now: number): void {
   if (disposed) return;
   const dt = Math.min(0.04, previousTime === 0 ? 0 : (now - previousTime) / 1000);
   previousTime = now;
-  if (alive && !levelUpPaused) {
+  if (alive && !levelUpPaused && !sunPhase) {
     elapsed += dt;
     strongBeatWindow = Math.max(0, strongBeatWindow - dt);
     attackCooldown = Math.max(0, attackCooldown - dt);
@@ -326,6 +357,8 @@ function frame(now: number): void {
     updateAllies(dt);
     updateMeteorStrikes(dt);
   }
+  if (!sunEncounterStarted && director.snapshot.complete && director.snapshot.defeated >= HORDE_BALANCE.firstWaveCount) beginSunPhase();
+  if (sunPhase) updateSunPhase(dt, now);
   updateCamera();
   updateHud();
   renderer.render(scene, camera);
@@ -468,7 +501,30 @@ function removeProjectile(index: number): void {
 }
 
 function onKeyDown(event: KeyboardEvent): void {
-  if (levelUpPaused) return;
+  if (sunPhase && event.code === 'Space') { event.preventDefault(); hitRhythmNote(); return; }
+  if (levelUpPaused) {
+    if (event.code === 'Space' || event.code === 'Enter') {
+      event.preventDefault();
+      if (event.repeat) return;
+      const focusedChoice = document.activeElement instanceof HTMLButtonElement
+        && document.activeElement.matches('button[data-upgrade]:not(:disabled)')
+        ? document.activeElement
+        : undefined;
+      const choice = focusedChoice ?? upgradeChoices.querySelector<HTMLButtonElement>('button[data-upgrade]:not(:disabled)');
+      choice?.click();
+      return;
+    }
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.code)) {
+      event.preventDefault();
+      const choices = [...upgradeChoices.querySelectorAll<HTMLButtonElement>('button[data-upgrade]:not(:disabled)')];
+      if (choices.length === 0) return;
+      const currentIndex = choices.indexOf(document.activeElement as HTMLButtonElement);
+      const step = event.code === 'ArrowLeft' || event.code === 'ArrowUp' ? -1 : 1;
+      choices[(currentIndex + step + choices.length) % choices.length].focus();
+      return;
+    }
+    return;
+  }
   if (['KeyW','KeyA','KeyS','KeyD','KeyE','KeyQ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','ShiftLeft','ShiftRight'].includes(event.code)) event.preventDefault();
   if (keys.has(event.code) || !alive) return;
   keys.add(event.code);
@@ -743,7 +799,9 @@ function updateHud(): void {
   buffStatus.textContent = activeBuffs.join(' · ');
   buffAura.visible = activeBuffs.length > 0 && (growthStacks > 0 || completoSeconds > 0 || empanadaSeconds > 0 || rinRinSeconds > 0);
   (buffAura.material as THREE.MeshBasicMaterial).color.set(empanadaSeconds > 0 ? '#f18a54' : rinRinSeconds > 0 ? '#6bd5d8' : '#95ca79');
-  if (alive && wave.complete) status.textContent = '¡Nivel completado! Derrotaste a los 15 oficiales.';
+  if (sunPhaseWon) status.textContent = 'El Sol se calmó. La plaza vuelve a estar en silencio.';
+  else if (sunPhase) status.textContent = 'Sigue el pulso: apunta al aro y toca ESPACIO.';
+  else if (alive && wave.complete) status.textContent = '¡Nivel completado! Derrotaste a los 15 oficiales.';
   else if (alive && !levelUpPaused) status.textContent = `Derribados: ${wave.defeated} · máximo ${HORDE_BALANCE.maximumAlive} oficiales activos.`;
 }
 
@@ -786,6 +844,7 @@ function resetRun(): void {
   tangananicaSide = 'right';
   foodDropChance = HORDE_BALANCE.foodBaseDropChance;
   everDroppedFood = false;
+  hasCompleteAppeared = false;
   activeCuecaMove = null;
   attackMarker.visible = false;
   sweepMarker.visible = sweepOutline.visible = false;
@@ -793,7 +852,100 @@ function resetRun(): void {
   upgradeChoices.replaceChildren();
   resetHuasoPose();
   alive = true;
+  sunPhase = sunPhaseWon = false;
+  sunEncounterStarted = false;
+  sunEntrance = 0;
+  sunEncounter.visible = false;
+  sunRhythmOverlay.hidden = true;
+  rhythmOrbElements.length = 0;
+  rhythmNotes.replaceChildren();
+  sunScoreLabel.textContent = '0 / 8';
+  sunHealthFill.style.width = '0%';
   status.textContent = 'Muévete, esquiva y baila para despejar la plaza.';
+}
+
+function beginSunPhase(): void {
+  sunEncounterStarted = true;
+  sunPhase = true;
+  sunPhaseWon = false;
+  sunEntrance = 0;
+  sunEncounter.visible = true;
+  rhythmStartedAt = performance.now();
+  rhythmHits = 0;
+  rhythmResolved = 0;
+  rhythmOrbElements.length = 0;
+  rhythmNotes.replaceChildren();
+  for (let index = 0; index < RHYTHM_NOTE_COUNT; index += 1) {
+    const orb = document.createElement('div');
+    orb.className = 'rhythm-note-orb';
+    orb.setAttribute('aria-label', `Pulso ${index + 1}`);
+    rhythmNotes.appendChild(orb);
+    rhythmOrbElements.push(orb);
+  }
+  rhythmFeedback.textContent = 'El Sol marca el compás · ¡prepárate!';
+  sunScoreLabel.textContent = `0 / ${RHYTHM_NOTE_COUNT}`;
+  sunHealthFill.style.width = '0%';
+  sunRhythmOverlay.hidden = false;
+  (document.getElementById('rhythm-retry') as HTMLButtonElement).hidden = true;
+}
+
+function updateSunPhase(dt: number, now: number): void {
+  if (!sunPhaseWon) {
+    sunEntrance = Math.min(1, sunEntrance + dt / 2.4);
+    const eased = 1 - (1 - sunEntrance) ** 3;
+    sunEncounter.position.set(0, 12 - eased * 8.6, -2);
+    sunEncounter.rotation.z = Math.sin(now / 400) * 0.025;
+    sunEncounter.scale.setScalar(2.35 + Math.sin(now / 260) * 0.035);
+  }
+  const elapsedMs = now - rhythmStartedAt;
+  for (let index = 0; index < rhythmOrbElements.length; index += 1) {
+    if (rhythmOrbElements[index].classList.contains('hit')) continue;
+    const targetAt = RHYTHM_APPROACH_MS + index * RHYTHM_BEAT_MS;
+    const progress = (elapsedMs - (targetAt - RHYTHM_APPROACH_MS)) / RHYTHM_APPROACH_MS;
+    rhythmOrbElements[index].style.left = `${-5 + progress * 83}%`;
+    if (elapsedMs > targetAt + 260) {
+      rhythmOrbElements[index].classList.add('hit');
+      rhythmResolved += 1;
+      rhythmFeedback.textContent = 'Se escapó el pulso · sigue con el siguiente';
+    }
+  }
+  if (rhythmResolved >= RHYTHM_NOTE_COUNT && !sunPhaseWon) {
+    sunPhaseWon = rhythmHits >= 6;
+    sunPhase = false;
+    rhythmFeedback.textContent = sunPhaseWon ? '¡Compás perfecto! El Sol se tranquiliza.' : 'El Sol aún ruge. Reinicia la partida para intentarlo otra vez.';
+    (document.getElementById('rhythm-retry') as HTMLButtonElement).hidden = sunPhaseWon;
+  }
+}
+
+function hitRhythmNote(): void {
+  if (!sunPhase || sunPhaseWon) return;
+  const now = performance.now();
+  const elapsedMs = now - rhythmStartedAt;
+  let closest = -1;
+  let closestDistance = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < rhythmOrbElements.length; index += 1) {
+    if (rhythmOrbElements[index].classList.contains('hit')) continue;
+    const targetAt = RHYTHM_APPROACH_MS + index * RHYTHM_BEAT_MS;
+    const distance = Math.abs(elapsedMs - targetAt);
+    if (distance < closestDistance) { closest = index; closestDistance = distance; }
+  }
+  if (closest < 0 || closestDistance > 260) {
+    rhythmFeedback.textContent = 'Fuera de pulso';
+    return;
+  }
+  rhythmOrbElements[closest].classList.add('hit');
+  rhythmResolved += 1;
+  rhythmHits += 1;
+  sunScoreLabel.textContent = `${rhythmHits} / ${RHYTHM_NOTE_COUNT}`;
+  sunHealthFill.style.width = `${Math.min(100, rhythmHits / 6 * 100)}%`;
+  rhythmFeedback.textContent = closestDistance < 100 ? '¡Perfecto!' : '¡Bien!';
+  if (rhythmHits >= 6) {
+    sunPhaseWon = true;
+    sunPhase = false;
+    for (const orb of rhythmOrbElements) orb.classList.add('hit');
+    rhythmFeedback.textContent = '¡Compás perfecto! El Sol se tranquiliza.';
+    (document.getElementById('rhythm-retry') as HTMLButtonElement).hidden = true;
+  }
 }
 
 function showToast(message: string): void {
@@ -804,53 +956,68 @@ function showToast(message: string): void {
 }
 
 function maybeDropFood(enemyId: string, position: THREE.Vector3): void {
-  if (foodPickups.size >= HORDE_BALANCE.maximumFoodPickups) return;
   const defeated = director.snapshot.defeated;
-  const guaranteed = !everDroppedFood && defeated === HORDE_BALANCE.firstWaveCount - 1;
-  const drops = guaranteed || Math.random() < foodDropChance;
+  const guaranteedComplete = defeated === 7 && !hasCompleteAppeared;
+  const guaranteedFood = !everDroppedFood && defeated >= HORDE_BALANCE.firstWaveCount - 1;
+  if (foodPickups.size >= HORDE_BALANCE.maximumFoodPickups && !guaranteedComplete && !guaranteedFood) return;
+  const drops = guaranteedComplete || guaranteedFood || Math.random() < foodDropChance;
   if (!drops) {
     foodDropChance = Math.min(HORDE_BALANCE.foodDropChanceMaximum, foodDropChance + HORDE_BALANCE.foodDropChanceStep);
     return;
   }
-  foodDropChance = HORDE_BALANCE.foodBaseDropChance;
-  everDroppedFood = true;
   const kinds: FoodKind[] = ['completo', 'sopaipilla', 'empanada'];
-  const kind = kinds[Math.floor(Math.random() * kinds.length)];
-  spawnFoodPickup(`${enemyId}-food`, kind, { x: position.x + (Math.random() - 0.5) * 1.2, z: position.z + (Math.random() - 0.5) * 1.2 });
-  showToast(`¡Apareció ${foodName(kind)}! Recógela`);
+  const kind = guaranteedComplete ? 'completo' : kinds[Math.floor(Math.random() * kinds.length)];
+  const spawned = spawnFoodPickup(`${enemyId}-food`, kind, { x: position.x + (Math.random() - 0.5) * 1.2, z: position.z + (Math.random() - 0.5) * 1.2 }, guaranteedComplete || guaranteedFood);
+  if (spawned) showToast(`¡Apareció ${foodName(kind)}! Recógela`);
 }
 
-function spawnFoodPickup(id: string, kind: FoodKind, position: Vector2XZ): void {
-  if (foodPickups.size >= HORDE_BALANCE.maximumFoodPickups) return;
+function spawnFoodPickup(id: string, kind: FoodKind, position: Vector2XZ, guaranteed = false): boolean {
+  if (foodPickups.size >= HORDE_BALANCE.maximumFoodPickups && !guaranteed) return false;
   const root = createFoodPickup(kind);
-  root.position.set(position.x, 0.45, position.z);
+  root.position.set(position.x, 0.1, position.z);
   scene.add(root);
-  foodPickups.set(id, { root, kind });
+  const glow = root.getObjectByName('food-glow') as THREE.Sprite;
+  foodPickups.set(id, { root, kind, availableAt: elapsed + 0.9, glow });
+  foodDropChance = HORDE_BALANCE.foodBaseDropChance;
+  everDroppedFood = true;
+  if (kind === 'completo') hasCompleteAppeared = true;
+  return true;
 }
 
 function createFoodPickup(kind: FoodKind): THREE.Group {
-  const root = new THREE.Group();
+  const root = kind === 'completo' ? createChileanCompletoModel()
+    : kind === 'sopaipilla' ? createChileanSopaipillaModel()
+      : createChileanEmpanadaModel();
   const color = kind === 'completo' ? '#e5a74e' : kind === 'sopaipilla' ? '#d98a3d' : '#d4b56f';
-  const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.08, 20), new THREE.MeshStandardMaterial({ color: '#e8dfca', roughness: 0.65 }));
-  plate.position.y = -0.17;
-  root.add(plate);
-  const food = new THREE.Mesh(
-    kind === 'completo' ? new THREE.CapsuleGeometry(0.18, 0.54, 4, 8) : new THREE.SphereGeometry(0.32, 10, 7),
-    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.22, flatShading: true }),
-  );
-  food.position.y = 0.06;
-  if (kind === 'completo') food.rotation.z = Math.PI / 2;
-  root.add(food);
-  const halo = new THREE.Mesh(new THREE.TorusGeometry(0.53, 0.035, 6, 24), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8 }));
+  root.scale.setScalar(kind === 'completo' ? 0.68 : 0.76);
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(kind === 'completo' ? 0.9 : 0.72, 0.045, 6, 24), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, depthWrite: false }));
   halo.rotation.x = Math.PI / 2;
+  halo.position.y = -0.1;
   root.add(halo);
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: foodGlowTexture,
+    color,
+    transparent: true,
+    opacity: 0.78,
+    blending: THREE.AdditiveBlending,
+    depthTest: false,
+    depthWrite: false,
+  }));
+  glow.name = 'food-glow';
+  glow.position.y = 0.85;
+  glow.scale.set(2.25, 2.25, 1);
+  root.add(glow);
   return root;
 }
 
 function updateFoodPickups(dt: number): void {
   for (const [id, pickup] of foodPickups) {
     pickup.root.rotation.y += dt * 1.1;
-    pickup.root.position.y = 0.42 + Math.sin(elapsed * 3 + id.length) * 0.09;
+    pickup.root.position.y = 0.1 + Math.sin(elapsed * 3 + id.length) * 0.04;
+    const glowPulse = 1 + Math.sin(elapsed * 5 + id.length) * 0.12;
+    pickup.glow.scale.set(2.25 * glowPulse, 2.25 * glowPulse, 1);
+    pickup.glow.material.opacity = 0.68 + glowPulse * 0.15;
+    if (elapsed < pickup.availableAt) continue;
     const dx = pickup.root.position.x - player.position.x;
     const dz = pickup.root.position.z - player.position.z;
     if (dx * dx + dz * dz > 1.25) continue;
@@ -1440,11 +1607,32 @@ function createOfficer(kind: LevelOneEnemyKind): THREE.Group {
 function resize(): void { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio, 1.8)); }
 function disposeObject(root: THREE.Object3D): void {
   root.traverse((object) => {
+    if (object instanceof THREE.Sprite) {
+      object.material.dispose();
+      return;
+    }
     if (!(object instanceof THREE.Mesh)) return;
     object.geometry.dispose();
     const materials = Array.isArray(object.material) ? object.material : [object.material];
     for (const material of materials) material.dispose();
   });
+}
+function createFoodGlowTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 128;
+  const context = canvas.getContext('2d');
+  if (context) {
+    const gradient = context.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gradient.addColorStop(0, 'rgba(255,255,255,0.95)');
+    gradient.addColorStop(0.2, 'rgba(255,245,210,0.72)');
+    gradient.addColorStop(0.58, 'rgba(255,210,125,0.24)');
+    gradient.addColorStop(1, 'rgba(255,180,80,0)');
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 128, 128);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
 }
 function dispose(): void {
   disposed = true; cancelAnimationFrame(requestId); clearTimeout(toastTimer);
@@ -1453,6 +1641,7 @@ function dispose(): void {
   clearBuffs();
   for (const pickup of foodPickups.values()) disposeObject(pickup.root);
   foodPickups.clear();
+  foodGlowTexture.dispose();
   horde.dispose(); renderer.dispose();
 }
 function required<T extends HTMLElement>(id: string): T { const element = document.getElementById(id); if (!(element instanceof HTMLElement)) throw new Error(`Falta #${id} en preview.html`); return element as T; }

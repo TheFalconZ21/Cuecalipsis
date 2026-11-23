@@ -80,4 +80,3 @@ Solicitado por el equipo como catálogo inicial de mejoras. Este documento defin
 - **Dev 2:** colaborar cuando el efecto interactúe con props, escala o estado del escenario.
 - **Dev 4:** representar cartas/selección, distracción, baile, meteorito, muñeca y zombies. No decidir daño ni conceder mejoras.
 - Los eventos anteriores son nombres descriptivos/propuestos hasta que se acuerde su payload en `src/core/`.
-

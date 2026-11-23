@@ -40,6 +40,19 @@ kbd { padding: 3px 6px; border: 1px solid rgba(255,255,255,.2); border-radius: 5
 .toast.visible { opacity: 1; transform: translate(-50%,0); }
 .level-up-overlay { position: absolute; z-index: 5; inset: 0; display: grid; place-items: center; padding: 22px; background: rgba(11,9,8,.68); backdrop-filter: blur(7px); }
 .level-up-overlay[hidden] { display: none; }
+.sun-rhythm-overlay { position:absolute; z-index:6; inset:0; display:grid; place-items:center; padding:20px; background:radial-gradient(ellipse at center,rgba(91,49,30,.38),rgba(12,10,9,.82)); }
+.sun-rhythm-overlay[hidden] { display:none; }
+.sun-rhythm-card { width:min(720px,100%); padding:clamp(22px,4vw,40px); border-radius:24px; text-align:center; }
+.sun-rhythm-card h2 { margin:0 0 8px; color:#ffe4a0; font-size:clamp(24px,5vw,38px); }
+.sun-rhythm-card > p:not(.eyebrow) { color:#e0d0ba; font-size:13px; }
+.sun-health { display:grid; grid-template-columns:1fr auto; gap:8px; margin:22px auto 16px; max-width:520px; text-align:left; color:#f1d9ae; font-size:11px; }
+.sun-health strong { text-align:right; }.sun-health div { grid-column:1/-1; height:8px; overflow:hidden; border-radius:9px; background:#ffffff20; }.sun-health i { display:block; width:0; height:100%; background:linear-gradient(90deg,#ed9d48,#ffe58e); transition:width .18s; }
+.rhythm-lane { position:relative; height:116px; max-width:520px; margin:0 auto; overflow:hidden; border:1px solid #ffe0a533; border-radius:16px; background:linear-gradient(90deg,#211915,#38271d 78%,#513323); touch-action:manipulation; }
+.hit-line { position:absolute; top:0; bottom:0; left:78%; width:2px; background:#fff0b8; box-shadow:0 0 14px #ffd678; }
+.rhythm-note-orb { position:absolute; top:50%; width:36px; height:36px; border:2px solid #ffe39a; border-radius:50%; background:radial-gradient(circle,#fff1bd 0 18%,#e6a249 25% 48%,#a85032 60%); box-shadow:0 0 18px #e6a249aa; transform:translate(-50%,-50%); }
+.rhythm-note-orb.hit { opacity:.25; }.rhythm-feedback { min-height:25px; margin:12px 0; color:#ffe0a0; font-size:12px; font-weight:700; }
+#rhythm-hit { padding:11px 28px; border:1px solid #ffe5a866; border-radius:12px; color:#27170f; background:linear-gradient(135deg,#ffe5a1,#e89a47); font-weight:800; cursor:pointer; }
+.rhythm-retry { display:block; margin:0 auto; padding:9px 20px; border:1px solid #ffe5a866; border-radius:10px; color:#ffe9c2; background:#6e3e29; cursor:pointer; }.rhythm-retry[hidden] { display:none; }
 .level-up-card { width: min(760px,100%); padding: clamp(22px,4vw,38px); border-radius: 22px; text-align: center; }
 .level-up-card h2 { margin: 0 0 8px; font-size: clamp(23px,4vw,34px); }
 .level-up-card > p:not(.eyebrow) { margin-bottom: 22px; color: #d3c5b2; font-size: 13px; }
