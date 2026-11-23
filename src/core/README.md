@@ -19,3 +19,7 @@ Este espacio alojará los contratos compartidos (`EventBus`, tipos/interfaces de
 `OnConsumableConsumed` publica `{ consumableId }` cuando el jugador termina de consumir un objeto. El módulo de escala escucha `completo-italiano` para activar su buff temporal; los emisores deben publicar el evento desde la acción real de consumo.
 
 Las ambigüedades de duración de corchea, Tiers y niveles de hordas están asignadas a los documentos `DECISIONS.md` de los roles responsables.
+
+### Contratos rítmicos extendidos (Dev 1)
+
+Los contratos rítmicos se ampliaron de forma aditiva: beats agendados, límites de sección, desbloqueo de slots y fin de pista. `OnBasicStepAttack` puede incluir `damageMultiplier`; `OnWeakStepAttack` distingue un MISS que también debe causar daño reducido. Combate debe mantener ambos juicios y aplicar el multiplicador. El bridge y los pendientes están documentados en `src/modules/rhythm-player/COMBAT-RHYTHM-HANDOFF.md`.
