@@ -4,10 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#17120f" />
-    <title>Cuecalipsis · Fuerza pública</title>
+    <title>Cuecalipsis · La plaza</title>
   </head>
   <body>
-    <main class="combat-shell">
+    <div id="main-menu-root"></div>
+    <main id="game-shell" class="combat-shell" hidden>
       <div id="viewport" class="viewport" aria-label="Prototipo jugable de combate"></div>
       <header class="topbar glass-panel">
         <img src="/assets/ui/cuecalipsis-fiesta-chilena.webp" alt="Cuecalipsis" style="width:clamp(115px,17vw,205px);height:auto;object-fit:contain" />
@@ -57,7 +58,6 @@
       </footer>
       <div id="toast" class="toast" aria-live="polite"></div>
     </main>
-    <script type="module" src="/src/modules/rhythm-player/rhythm-audio-entry.ts"></script>
-    <script type="module" src="/src/modules/combat-hordes/preview.ts"></script>
+    <script type="module" src="/src/modules/art-vfx-ui/MainMenuEntry.ts"></script>
   </body>
 </html>
