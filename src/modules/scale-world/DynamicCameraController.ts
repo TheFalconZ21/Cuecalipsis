@@ -72,11 +72,16 @@ export class DynamicCameraController {
 
     const horizontalDistance = (desiredDistance + pulse) * Math.cos(this.pitchRadians);
     const height = (desiredDistance + pulse) * Math.sin(this.pitchRadians);
-    this.target.set(this.playerWorldPosition.x, this.playerWorldPosition.y, this.playerWorldPosition.z);
-    this.desiredPosition.set(
+    // Aim at the huaso's body center so its feet do not sit on the screen edge.
+    this.target.set(
       this.playerWorldPosition.x,
-      this.playerWorldPosition.y + height,
-      this.playerWorldPosition.z + horizontalDistance,
+      this.playerWorldPosition.y + playerHeight * 0.52,
+      this.playerWorldPosition.z,
+    );
+    this.desiredPosition.set(
+      this.target.x,
+      this.target.y + height,
+      this.target.z + horizontalDistance,
     );
     const interpolation = 1 - Math.exp(-this.followSharpness * deltaSeconds);
     this.camera.position.lerp(this.desiredPosition, interpolation);
@@ -92,9 +97,11 @@ export class DynamicCameraController {
   }
 
   private updateOcclusion(): void {
-    this.direction.subVectors(this.playerWorldPosition, this.camera.position).normalize();
+    this.direction.subVectors(this.target, this.camera.position).normalize();
     this.raycaster.set(this.camera.position, this.direction);
-    this.raycaster.far = this.camera.position.distanceTo(this.playerWorldPosition) - 0.35;
+    const playerScale = Math.max(0.01, this.getPlayerScale());
+    const playerHeight = this.playerHeightAtScaleOne * playerScale;
+    this.raycaster.far = this.camera.position.distanceTo(this.target) - playerHeight * 0.42;
     this.intersections.length = 0;
     this.raycaster.intersectObjects(this.scene.children, true, this.intersections);
     this.nextOccluders.clear();

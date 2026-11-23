@@ -10,15 +10,26 @@ export interface WorldStageOptions {
 export class WorldStageController {
   readonly root = new THREE.Group();
   readonly trampleTargets: TrampleTarget[] = [];
-  private readonly arenaRadius = 24;
+  readonly arenaRadius = 24;
   private readonly ownedGeometries: THREE.BufferGeometry[] = [];
   private readonly ownedMaterials: THREE.Material[] = [];
 
   constructor({ scene }: WorldStageOptions) {
     scene.add(this.root);
     this.createArena();
+    this.createWayfinding();
     this.createFurnitureAndFences();
     this.createOcclusionBlocks();
+  }
+
+  /** Keeps a point inside the graybox boundary; the host owns player movement. */
+  constrainToArena(position: THREE.Vector3, inset = 0): void {
+    const safeRadius = Math.max(0, this.arenaRadius - Math.max(0, inset));
+    const distance = Math.hypot(position.x, position.z);
+    if (distance <= safeRadius || distance === 0) return;
+    const factor = safeRadius / distance;
+    position.x *= factor;
+    position.z *= factor;
   }
 
   dispose(): void {
@@ -38,7 +49,7 @@ export class WorldStageController {
     ground.receiveShadow = true;
     this.addOwned(groundGeometry, ground);
 
-    const plazaGeometry = new THREE.CircleGeometry(6, 48);
+    const plazaGeometry = new THREE.CircleGeometry(6.5, 48);
     plazaGeometry.rotateX(-Math.PI / 2);
     const plaza = new THREE.Mesh(plazaGeometry, this.material('#c3a16e'));
     plaza.position.y = 0.015;
@@ -51,6 +62,47 @@ export class WorldStageController {
     rim.rotation.x = Math.PI / 2;
     rim.position.y = 0.12;
     this.addOwned(rim.geometry, rim);
+
+    this.addPavingRing(1.25, 0.045, '#ad4d38');
+    this.addPavingRing(1.48, 0.035, '#3e7181');
+  }
+
+  private createWayfinding(): void {
+    // Broad paving leads from the clear starting plaza toward the neighborhood.
+    this.addPavingStrip('tier1-main-walkway', 4.6, 15.2, 0, 14.1, '#b79c72');
+    this.addPavingStrip('tier1-west-walkway', 2.8, 11.5, -8.2, 0, '#a9906c', Math.PI / 2);
+    this.addPavingStrip('tier1-east-walkway', 2.8, 11.5, 8.2, 0, '#a9906c', Math.PI / 2);
+
+    // Small paving stones make the central plaza read as a meeting point.
+    for (let index = 0; index < 12; index += 1) {
+      const angle = (index / 12) * Math.PI * 2;
+      const radius = 5.7;
+      const geometry = new THREE.BoxGeometry(0.72, 0.035, 0.28);
+      const stone = new THREE.Mesh(geometry, this.material(index % 2 === 0 ? '#d5bd8f' : '#b89c70'));
+      stone.position.set(Math.cos(angle) * radius, 0.045, Math.sin(angle) * radius);
+      stone.rotation.y = -angle;
+      stone.receiveShadow = true;
+      this.addOwned(geometry, stone);
+    }
+  }
+
+  private addPavingRing(radius: number, thickness: number, color: string): void {
+    const geometry = new THREE.TorusGeometry(radius, thickness, 5, 48);
+    const ring = new THREE.Mesh(geometry, this.material(color));
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.055;
+    this.addOwned(geometry, ring);
+  }
+
+  private addPavingStrip(id: string, width: number, length: number, x: number, z: number, color: string, rotation = 0): void {
+    const geometry = new THREE.PlaneGeometry(width, length);
+    geometry.rotateX(-Math.PI / 2);
+    const strip = new THREE.Mesh(geometry, this.material(color));
+    strip.position.set(x, 0.025, z);
+    strip.rotation.y = rotation;
+    strip.receiveShadow = true;
+    strip.name = id;
+    this.addOwned(geometry, strip);
   }
 
   private createFurnitureAndFences(): void {
