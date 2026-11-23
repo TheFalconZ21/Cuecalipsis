@@ -6,6 +6,7 @@ import type { CuecaStep, UpgradeChoice, Vector2XZ } from '../../core/GameContrac
 import type { LevelOneEnemyKind } from './HordeLevelOne';
 import { HordeLevelOne } from './HordeLevelOne';
 import { HORDE_BALANCE, HordeDirector } from './HordeDirector';
+import { createSunModel } from '../art-vfx-ui/SunModel';
 
 const viewport = required<HTMLDivElement>('viewport');
 const waveLabel = required<HTMLElement>('wave-label');
@@ -27,6 +28,12 @@ const upgradeChoices = required<HTMLDivElement>('upgrade-choices');
 const status = required<HTMLElement>('status');
 const toast = required<HTMLElement>('toast');
 const rhythmNote = required<HTMLElement>('rhythm-note');
+const sunRhythmOverlay = required<HTMLElement>('sun-rhythm-overlay');
+const rhythmNotes = required<HTMLDivElement>('rhythm-notes');
+const rhythmLane = required<HTMLDivElement>('rhythm-lane');
+const rhythmFeedback = required<HTMLElement>('rhythm-feedback');
+const sunScoreLabel = required<HTMLElement>('sun-score');
+const sunHealthFill = required<HTMLElement>('sun-health-fill');
 
 const scene = new THREE.Scene();
 const enemyHealthFullColor = new THREE.Color('#d45c45');
@@ -51,6 +58,12 @@ createArena();
 const huasoRig = createHuaso();
 const player = huasoRig.root;
 scene.add(player);
+const sunEncounter = createSunModel();
+sunEncounter.position.set(0, 12, -2);
+sunEncounter.rotation.y = Math.PI;
+sunEncounter.scale.setScalar(2.35);
+sunEncounter.visible = false;
+scene.add(sunEncounter);
 const keys = new Set<string>();
 const enemyViews = new Map<string, EnemyView>();
 const projectiles: Projectile[] = [];
@@ -143,6 +156,16 @@ let toastTimer = 0;
 let requestId = 0;
 let director = new HordeDirector(spawnEnemy);
 let disposed = false;
+let sunPhase = false;
+let sunPhaseWon = false;
+let sunEntrance = 0;
+let rhythmStartedAt = 0;
+let rhythmHits = 0;
+let rhythmResolved = 0;
+const rhythmOrbElements: HTMLDivElement[] = [];
+const RHYTHM_BEAT_MS = 720; // provisional until connected to RhythmClock / final BPM
+const RHYTHM_APPROACH_MS = 2200;
+const RHYTHM_NOTE_COUNT = 8;
 configureHordeBuffs();
 const unsubscribers: Unsubscribe[] = [
   eventBus.on('OnEnemyDestroyed', ({ enemyId }) => {
@@ -221,6 +244,9 @@ if (HORDE_BALANCE.rhythm.source === 'strong-beat') {
 }
 
 document.getElementById('restart')?.addEventListener('click', resetRun);
+document.getElementById('rhythm-hit')?.addEventListener('click', hitRhythmNote);
+document.getElementById('rhythm-retry')?.addEventListener('click', beginSunPhase);
+rhythmLane.addEventListener('pointerdown', hitRhythmNote);
 upgradeChoices.addEventListener('click', handleUpgradeChoiceClick);
 window.addEventListener('keydown', onKeyDown);
 window.addEventListener('keyup', (event) => keys.delete(event.code));
@@ -300,7 +326,7 @@ function frame(now: number): void {
   if (disposed) return;
   const dt = Math.min(0.04, previousTime === 0 ? 0 : (now - previousTime) / 1000);
   previousTime = now;
-  if (alive && !levelUpPaused) {
+  if (alive && !levelUpPaused && !sunPhase) {
     elapsed += dt;
     strongBeatWindow = Math.max(0, strongBeatWindow - dt);
     attackCooldown = Math.max(0, attackCooldown - dt);
@@ -326,6 +352,8 @@ function frame(now: number): void {
     updateAllies(dt);
     updateMeteorStrikes(dt);
   }
+  if (!sunPhase && director.snapshot.complete) beginSunPhase();
+  if (sunPhase) updateSunPhase(dt, now);
   updateCamera();
   updateHud();
   renderer.render(scene, camera);
@@ -468,6 +496,7 @@ function removeProjectile(index: number): void {
 }
 
 function onKeyDown(event: KeyboardEvent): void {
+  if (sunPhase && event.code === 'Space') { event.preventDefault(); hitRhythmNote(); return; }
   if (levelUpPaused) return;
   if (['KeyW','KeyA','KeyS','KeyD','KeyE','KeyQ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','ShiftLeft','ShiftRight'].includes(event.code)) event.preventDefault();
   if (keys.has(event.code) || !alive) return;
@@ -743,7 +772,9 @@ function updateHud(): void {
   buffStatus.textContent = activeBuffs.join(' · ');
   buffAura.visible = activeBuffs.length > 0 && (growthStacks > 0 || completoSeconds > 0 || empanadaSeconds > 0 || rinRinSeconds > 0);
   (buffAura.material as THREE.MeshBasicMaterial).color.set(empanadaSeconds > 0 ? '#f18a54' : rinRinSeconds > 0 ? '#6bd5d8' : '#95ca79');
-  if (alive && wave.complete) status.textContent = '¡Nivel completado! Derrotaste a los 15 oficiales.';
+  if (sunPhaseWon) status.textContent = 'El Sol se calmó. La plaza vuelve a estar en silencio.';
+  else if (sunPhase) status.textContent = 'Sigue el pulso: apunta al aro y toca ESPACIO.';
+  else if (alive && wave.complete) status.textContent = '¡Nivel completado! Derrotaste a los 15 oficiales.';
   else if (alive && !levelUpPaused) status.textContent = `Derribados: ${wave.defeated} · máximo ${HORDE_BALANCE.maximumAlive} oficiales activos.`;
 }
 
@@ -793,7 +824,98 @@ function resetRun(): void {
   upgradeChoices.replaceChildren();
   resetHuasoPose();
   alive = true;
+  sunPhase = sunPhaseWon = false;
+  sunEntrance = 0;
+  sunEncounter.visible = false;
+  sunRhythmOverlay.hidden = true;
+  rhythmOrbElements.length = 0;
+  rhythmNotes.replaceChildren();
+  sunScoreLabel.textContent = '0 / 8';
+  sunHealthFill.style.width = '0%';
   status.textContent = 'Muévete, esquiva y baila para despejar la plaza.';
+}
+
+function beginSunPhase(): void {
+  sunPhase = true;
+  sunPhaseWon = false;
+  sunEntrance = 0;
+  sunEncounter.visible = true;
+  rhythmStartedAt = performance.now();
+  rhythmHits = 0;
+  rhythmResolved = 0;
+  rhythmOrbElements.length = 0;
+  rhythmNotes.replaceChildren();
+  for (let index = 0; index < RHYTHM_NOTE_COUNT; index += 1) {
+    const orb = document.createElement('div');
+    orb.className = 'rhythm-note-orb';
+    orb.setAttribute('aria-label', `Pulso ${index + 1}`);
+    rhythmNotes.appendChild(orb);
+    rhythmOrbElements.push(orb);
+  }
+  rhythmFeedback.textContent = 'El Sol marca el compás · ¡prepárate!';
+  sunScoreLabel.textContent = `0 / ${RHYTHM_NOTE_COUNT}`;
+  sunHealthFill.style.width = '0%';
+  sunRhythmOverlay.hidden = false;
+  (document.getElementById('rhythm-retry') as HTMLButtonElement).hidden = true;
+}
+
+function updateSunPhase(dt: number, now: number): void {
+  if (!sunPhaseWon) {
+    sunEntrance = Math.min(1, sunEntrance + dt / 2.4);
+    const eased = 1 - (1 - sunEntrance) ** 3;
+    sunEncounter.position.set(0, 12 - eased * 8.6, -2);
+    sunEncounter.rotation.z = Math.sin(now / 400) * 0.025;
+    sunEncounter.scale.setScalar(2.35 + Math.sin(now / 260) * 0.035);
+  }
+  const elapsedMs = now - rhythmStartedAt;
+  for (let index = 0; index < rhythmOrbElements.length; index += 1) {
+    if (rhythmOrbElements[index].classList.contains('hit')) continue;
+    const targetAt = RHYTHM_APPROACH_MS + index * RHYTHM_BEAT_MS;
+    const progress = (elapsedMs - (targetAt - RHYTHM_APPROACH_MS)) / RHYTHM_APPROACH_MS;
+    rhythmOrbElements[index].style.left = `${-5 + progress * 83}%`;
+    if (elapsedMs > targetAt + 260) {
+      rhythmOrbElements[index].classList.add('hit');
+      rhythmResolved += 1;
+      rhythmFeedback.textContent = 'Se escapó el pulso · sigue con el siguiente';
+    }
+  }
+  if (rhythmResolved >= RHYTHM_NOTE_COUNT && !sunPhaseWon) {
+    sunPhaseWon = rhythmHits >= 6;
+    sunPhase = false;
+    rhythmFeedback.textContent = sunPhaseWon ? '¡Compás perfecto! El Sol se tranquiliza.' : 'El Sol aún ruge. Reinicia la partida para intentarlo otra vez.';
+    (document.getElementById('rhythm-retry') as HTMLButtonElement).hidden = sunPhaseWon;
+  }
+}
+
+function hitRhythmNote(): void {
+  if (!sunPhase || sunPhaseWon) return;
+  const now = performance.now();
+  const elapsedMs = now - rhythmStartedAt;
+  let closest = -1;
+  let closestDistance = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < rhythmOrbElements.length; index += 1) {
+    if (rhythmOrbElements[index].classList.contains('hit')) continue;
+    const targetAt = RHYTHM_APPROACH_MS + index * RHYTHM_BEAT_MS;
+    const distance = Math.abs(elapsedMs - targetAt);
+    if (distance < closestDistance) { closest = index; closestDistance = distance; }
+  }
+  if (closest < 0 || closestDistance > 260) {
+    rhythmFeedback.textContent = 'Fuera de pulso';
+    return;
+  }
+  rhythmOrbElements[closest].classList.add('hit');
+  rhythmResolved += 1;
+  rhythmHits += 1;
+  sunScoreLabel.textContent = `${rhythmHits} / ${RHYTHM_NOTE_COUNT}`;
+  sunHealthFill.style.width = `${Math.min(100, rhythmHits / 6 * 100)}%`;
+  rhythmFeedback.textContent = closestDistance < 100 ? '¡Perfecto!' : '¡Bien!';
+  if (rhythmHits >= 6) {
+    sunPhaseWon = true;
+    sunPhase = false;
+    for (const orb of rhythmOrbElements) orb.classList.add('hit');
+    rhythmFeedback.textContent = '¡Compás perfecto! El Sol se tranquiliza.';
+    (document.getElementById('rhythm-retry') as HTMLButtonElement).hidden = true;
+  }
 }
 
 function showToast(message: string): void {
