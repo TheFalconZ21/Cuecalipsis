@@ -15,6 +15,13 @@ Para ver ambos a la vez en el navegador, inicia el servidor con `npm run dev` y 
 `http://localhost:5173/models.html`. Se pueden rotar y acercar con el mouse o con
 gestos táctiles.
 
+## Sol caricaturesco
+
+`src/modules/art-vfx-ui/SunModel.ts` exporta `createSunModel()`, un personaje solar
+low-poly inspirado en la ilustración de referencia: rayos cálidos, rostro dorado,
+cejas expresivas, ojos, nariz, mejillas en espiral y sonrisa con dientes. El frente
+mira hacia -Z. También aparece en `models.html`.
+
 ## Prop del completo italiano
 
 `src/modules/art-vfx-ui/ChileanCompletoModel.ts` exporta
@@ -22,3 +29,11 @@ gestos táctiles.
 y mayo. El origen está en la base y las piezas facetadas se mantienen separadas
 para facilitar futuras variaciones visuales. También aparece en `models.html` junto
 a los modelos del nivel 1.
+
+## Comida callejera chilena
+
+`src/modules/art-vfx-ui/ChileanStreetFoodModels.ts` exporta
+`createChileanEmpanadaModel()` y `createChileanSopaipillaModel()`. Ambos modelos
+low-poly conservan piezas facetadas separadas, materiales tostados y origen en
+la base. La empanada representa una empanada de pino horneada con repulgue; la
+sopaipilla, una masa redonda de zapallo frita. Se muestran en `models.html`.

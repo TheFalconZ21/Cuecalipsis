@@ -28,6 +28,7 @@ export interface UpgradeChoice { id: string; name: string; description: string; 
 export interface OnLevelUpReadyPayload { choices: [UpgradeChoice, UpgradeChoice, UpgradeChoice] }
 export interface OnGamePauseChangedPayload { paused: boolean; reason: 'Manual' | 'LevelUp' | 'System' }
 export interface OnGameResetPayload { seed?: number }
+export interface OnConsumableConsumedPayload { consumableId: string }
 export interface OnGameStateChangedPayload { previous: GameState; current: GameState }
 
 /** Mapa canónico de nombres a payloads utilizado por EventBus. */
@@ -49,5 +50,6 @@ export interface GameEvents {
   OnLevelUpReady: OnLevelUpReadyPayload;
   OnGamePauseChanged: OnGamePauseChangedPayload;
   OnGameReset: OnGameResetPayload;
+  OnConsumableConsumed: OnConsumableConsumedPayload;
   OnGameStateChanged: OnGameStateChangedPayload;
 }

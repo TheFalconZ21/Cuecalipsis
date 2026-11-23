@@ -31,12 +31,12 @@ h1 { margin: 0; font-size: clamp(28px, 4vw, 48px); letter-spacing: -.04em; }
   left: 0;
   display: flex;
   justify-content: center;
-  gap: clamp(65px, 18vw, 260px);
+  gap: clamp(8px, 1vw, 18px);
   pointer-events: none;
 }
 
 .labels span {
-  min-width: 145px;
+  min-width: 132px;
   padding: 10px 16px;
   border: 1px solid #79654b;
   border-radius: 999px;
@@ -49,7 +49,7 @@ h1 { margin: 0; font-size: clamp(28px, 4vw, 48px); letter-spacing: -.04em; }
 }
 
 @media (max-width: 580px) {
-  .labels { gap: 22px; }
-  .labels span { min-width: 0; padding: 9px 12px; font-size: 11px; }
+  .labels { gap: 6px; flex-wrap: wrap; padding: 0 10px; }
+  .labels span { min-width: 0; padding: 8px 10px; font-size: 10px; }
   .hint { max-width: 230px; }
 }
