@@ -1,17 +1,37 @@
-# Decisiones pendientes — Dev 1
+# Decisiones acordadas — Dev 1
 
-## Duración de corchea y significado de BPM
+Estas decisiones reemplazan las recomendaciones anteriores que aparezcan en los manuales y skills del proyecto para ritmo, carga de habilidad y controles.
 
-Los documentos ofrecen dos fórmulas incompatibles para la duración de una subdivisión:
+## Reloj y métrica
 
-- `60 / BPM / 2`: interpreta BPM como negras y divide cada negra en dos corcheas.
-- `60 / BPM / 3`: interpreta BPM como negras con puntillo y divide cada negra con puntillo en tres corcheas para el 6/8.
+- Duración de cada corchea: `60 / BPM / 3` segundos.
+- En esta convención, el BPM de cada pista se expresa en negras con puntillo: tres corcheas por pulso.
+- Cada compás tiene seis corcheas, índices `0–5`; los pulsos fuertes son `0` y `3`.
+- Al inicio se integra una sola pista: cueca tradicional. El BPM concreto debe medirse/confirmarse contra el archivo de audio seleccionado y vivir en la configuración, no hardcodeado en el reloj.
+- Como referencia, el análisis de `La Rosa con el Clavel.mp3` dio aproximadamente `83–85 BPM` en negras con puntillo (`126–128 BPM` contando negras). Es una estimación; verificarla con el loop final antes de fijar el valor.
 
-El manual de Dev 1 deja explícita la elección al desarrollador responsable. **No fijar una de estas convenciones por inferencia.** Dev 1 debe decidir cuál refleja las pistas y el BPM de los arquetipos, registrar la fórmula, la relación entre pulso fuerte y subdivisión, y cómo se validará con audio antes de implementar `RhythmClock`.
+## Ataque básico y carga
 
-### Resolución
+- `Space` ejecuta el ataque básico de la sección coreográfica actual.
+- Atinar al pulso otorga daño bonus. `PERFECT` (`±45 ms`) hace crítico; `GOOD` (`>45 ms` y `≤95 ms`) da bonus sin crítico; `MISS` (`>95 ms`) no otorga bonus rítmico. Se conservan inicialmente esas ventanas, salvo que el balance del track requiera ajuste.
+- La carga de la habilidad superior aumenta al dañar enemigos y destruir el escenario. No aumenta por acertar inputs sin causar ese daño/destrucción. Los valores por daño y por prop se balancean en `GameConfigs.json`.
 
-- Convención BPM elegida: _pendiente_
-- Duración de corchea: _pendiente_
-- Relación con el pulso fuerte (índices 0 y 3): _pendiente_
-- Responsable/fecha: _pendiente_
+## Habilidad superior y secciones
+
+- `C` activa la habilidad superior cuando está disponible; no se dispara automáticamente al llenar la barra.
+- La habilidad superior cambia con la sección actual de la cueca (por ejemplo, Escobillado o Zapateo) y usa la variante correspondiente a esa sección al momento de activarla.
+- Cambiar de sección no vacía ni reinicia la carga acumulada.
+- La activación consume la carga disponible; después vuelve a acumularse mediante daño a enemigos y destrucción del entorno.
+
+## Alcance inicial y controles
+
+- Un único arquetipo/pista jugable: cueca tradicional.
+- `WASD`: movimiento.
+- `Space`: ataque básico e input de ritmo.
+- `C`: habilidad superior manual.
+
+## Pendiente antes de integrar
+
+- Confirmar BPM exacto y punto de loop de la pista tradicional definitiva.
+- Acordar con Dev 3 cómo `OnEnemyDamaged`/`OnEnemyDestroyed` y con Dev 2 cómo `OnPropTrampled` alimentan la carga, mediante contratos de `src/core/`.
+- Definir valores de carga por daño/destrucción y escalado de crítico/bonus en la configuración compartida.
