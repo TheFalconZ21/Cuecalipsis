@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { PauseMenu } from './modules/art-vfx-ui/PauseMenu';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 
@@ -27,6 +28,17 @@ const light = new THREE.DirectionalLight('#ffffff', 2.5);
 light.position.set(3, 5, 4);
 scene.add(light);
 
+let gameTimeScale = 1;
+let gameRunning = true;
+const pauseMenu = new PauseMenu({
+  host: app,
+  setTimeScale: (scale) => { gameTimeScale = THREE.MathUtils.clamp(scale, 0, 1); },
+  restart: () => window.location.reload(),
+  enterMainMenu: () => { gameRunning = false; },
+  startGame: () => window.location.reload(),
+});
+const gameClock = new THREE.Clock();
+
 function resize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -34,7 +46,13 @@ function resize() {
 }
 
 window.addEventListener('resize', resize);
+window.addEventListener('pagehide', () => {
+  pauseMenu.dispose();
+  renderer.setAnimationLoop(null);
+  renderer.dispose();
+}, { once: true });
 renderer.setAnimationLoop(() => {
-  huasoPlaceholder.rotation.y += 0.005;
+  const scaledDelta = gameClock.getDelta() * gameTimeScale;
+  if (gameRunning) huasoPlaceholder.rotation.y += 0.5 * scaledDelta;
   renderer.render(scene, camera);
 });
