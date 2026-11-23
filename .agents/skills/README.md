@@ -1,5 +1,5 @@
 # Skills de Cuecalipsis
 
-El catálogo íntegro de las 17 skills y el texto de `AGENTS.md` original se conserva en `../../skills.pdf`. Los manuales de rol y arquitectura también están disponibles como PDF en la raíz. Las reglas operativas vigentes para este árbol están resumidas en el `AGENTS.md` raíz y en los `README.md`/`DECISIONS.md` de cada módulo.
+Las 17 skills del catálogo están disponibles como `SKILL.md` dentro de sus carpetas numeradas. `../../skills.pdf` se conserva como fuente original de referencia; los manuales de rol y arquitectura también permanecen en la raíz.
 
-Esta carpeta queda preparada para materializar skills individuales cuando el equipo vaya a usar Codex con esos flujos. No asumir que los `.md` enumerados dentro del PDF ya existen aquí.
+El protocolo global vigente está en `../../AGENTS.md`. Las decisiones pendientes específicas de cada rol están en `../../src/modules/<rol>/DECISIONS.md`.
