@@ -12,6 +12,7 @@ const waveLabel = required<HTMLElement>('wave-label');
 const waveCount = required<HTMLElement>('wave-count');
 const healthValue = required<HTMLElement>('health-value');
 const healthFill = required<HTMLDivElement>('health-fill');
+const buffStatus = required<HTMLElement>('buff-status');
 const levelValue = required<HTMLElement>('level-value');
 const experienceValue = required<HTMLElement>('experience-value');
 const experienceFill = required<HTMLDivElement>('experience-fill');
@@ -28,6 +29,8 @@ const toast = required<HTMLElement>('toast');
 const rhythmNote = required<HTMLElement>('rhythm-note');
 
 const scene = new THREE.Scene();
+const enemyHealthFullColor = new THREE.Color('#d45c45');
+const enemyHealthEmptyColor = new THREE.Color('#211a18');
 scene.background = new THREE.Color('#17120f');
 scene.fog = new THREE.Fog('#17120f', 28, 54);
 const camera = new THREE.PerspectiveCamera(48, innerWidth / innerHeight, 0.1, 90);
@@ -51,6 +54,7 @@ scene.add(player);
 const keys = new Set<string>();
 const enemyViews = new Map<string, EnemyView>();
 const projectiles: Projectile[] = [];
+const foodPickups = new Map<string, FoodPickup>();
 const shotGeometry = new THREE.SphereGeometry(0.16, 8, 6);
 const shotMaterial = new THREE.MeshStandardMaterial({ color: '#f3a363', emissive: '#7b2815', emissiveIntensity: 1.5 });
 const attackGeometry = new THREE.RingGeometry(0.3, HORDE_BALANCE.attackRange, 36);
@@ -87,6 +91,11 @@ scene.add(sweepOutline);
 
 const vueltaShield = createVueltaShield();
 player.add(vueltaShield);
+const buffAura = new THREE.Mesh(new THREE.TorusGeometry(0.76, 0.055, 8, 32), new THREE.MeshBasicMaterial({ color: '#95ca79', transparent: true, opacity: 0.9 }));
+buffAura.rotation.x = -Math.PI / 2;
+buffAura.position.y = 0.08;
+buffAura.visible = false;
+player.add(buffAura);
 
 let horde = new HordeLevelOne(eventBus, getAttackDirection);
 let elapsed = 0;
@@ -98,12 +107,29 @@ let escobilladoCooldown = 0;
 let dashCooldown = 0;
 let dashFor = 0;
 let alive = true;
-let score = 0;
 let playerLevel = 1;
 let experience = 0;
+let foodDropChance: number = HORDE_BALANCE.foodBaseDropChance;
+let everDroppedFood = false;
+let completoSeconds = 0;
+let empanadaSeconds = 0;
 let skillCharge = 0;
 let levelUpPaused = false;
 let upgradeLevels = { zapateo: 0, escobillado: 0, vuelta: 0 };
+type SongBuffId = 'la-senora-interesante' | 'baila-sin-cesar' | 'rin-rin-raja' | 'tangananica-tanganana' | 'dinosaurio-anacleto' | 'guacala' | 'mi-muneca-me-hablo' | 'arwrarwrirwrarwro';
+const acquiredSongBuffs = new Set<SongBuffId>();
+let growthStacks = 0;
+let senoraSeconds = 0;
+let decoyRoot: THREE.Group | null = null;
+let rinRinSeconds = 0;
+let rinRinCooldown = 0;
+let tangananicaSide: 'left' | 'right' = 'right';
+let guacalaCooldown = HORDE_BALANCE.guacalaIntervalSeconds;
+let munecaRoot: THREE.Group | null = null;
+let munecaCooldown = 0;
+let zombieAllies: ZombieAlly[] = [];
+let meteorStrikes: MeteorStrike[] = [];
+let anacletoCooldown = 0;
 let vueltaActive = false;
 let vueltaElapsed = 0;
 let vueltaCooldown = 0;
@@ -117,6 +143,7 @@ let toastTimer = 0;
 let requestId = 0;
 let director = new HordeDirector(spawnEnemy);
 let disposed = false;
+configureHordeBuffs();
 const unsubscribers: Unsubscribe[] = [
   eventBus.on('OnEnemyDestroyed', ({ enemyId }) => {
     const view = enemyViews.get(enemyId);
@@ -124,9 +151,30 @@ const unsubscribers: Unsubscribe[] = [
     scene.remove(view.root);
     disposeObject(view.root);
     enemyViews.delete(enemyId);
-    score += 1;
+    director.onOfficerDefeated();
+    growthStacks += 1;
+    updatePlayerGrowthVisual();
     grantExperience(HORDE_BALANCE.experiencePerEnemy);
-    showToast('Enemigo derribado · experiencia obtenida');
+    maybeDropFood(enemyId, view.root.position);
+    showToast(`Enemigo derribado · tamaño +${Math.round(growthStacks * HORDE_BALANCE.growthPerOfficerKill * 100)}% · resistencia +${Math.round(growthStacks * HORDE_BALANCE.resistancePerOfficerKill * 100)}%`);
+  }),
+  eventBus.on('OnEnemyDamaged', ({ enemyId, source, remainingHealth }) => {
+    const view = enemyViews.get(enemyId);
+    if (!view) return;
+    updateEnemyHealthBar(view, remainingHealth);
+    if (acquiredSongBuffs.has('baila-sin-cesar')) view.danceSeconds = HORDE_BALANCE.bailaDanceDurationSeconds;
+    if (source === 'Arwrarwrirwrarwro' && Math.random() < HORDE_BALANCE.zombieInfectionChance) {
+      view.infectionSeconds = HORDE_BALANCE.zombieInfectionDurationSeconds;
+      view.infectionTick = HORDE_BALANCE.zombieInfectionTickSeconds;
+      view.infected = true;
+      view.healthFill.material.color.set('#91d07b');
+    }
+    if (acquiredSongBuffs.has('rin-rin-raja') && rinRinCooldown <= 0 && source.startsWith('BasicStep:') && isBehindOfficer(view)) {
+      rinRinSeconds = HORDE_BALANCE.rinRinBuffDurationSeconds;
+      rinRinCooldown = HORDE_BALANCE.rinRinCooldownSeconds;
+      invulnerableFor = Math.max(invulnerableFor, HORDE_BALANCE.rinRinInvulnerabilitySeconds);
+      showToast('Rin Rin Raja · velocidad e invulnerabilidad');
+    }
   }),
   eventBus.on('OnBasicStepAttack', ({ step, judgement, position }) => {
     nextStepLabel.textContent = step;
@@ -134,17 +182,37 @@ const unsubscribers: Unsubscribe[] = [
       ? HORDE_BALANCE.skillChargePerfect
       : HORDE_BALANCE.skillChargeGood));
     if (skillCharge >= HORDE_BALANCE.skillChargeMaximum) unleashSuperior(step, position);
+    if (munecaRoot && munecaCooldown <= 0) {
+      munecaCooldown = HORDE_BALANCE.munecaAttackCooldownSeconds;
+      const baseDamage = judgement === 'PERFECT' ? HORDE_BALANCE.perfectAttackDamage : HORDE_BALANCE.goodAttackDamage;
+      horde.damageArea(position, 1.35, Math.max(1, Math.round(baseDamage * HORDE_BALANCE.munecaDamageMultiplier)), 'Mi muñeca me habló');
+    }
   }),
   eventBus.on('OnBeat', ({ isStrongBeat, subdivisionIndex }) => {
     if (HORDE_BALANCE.rhythm.source === 'strong-beat' && isStrongBeat && subdivisionIndex === HORDE_BALANCE.rhythm.strongBeatSubdivision) {
       strongBeatWindow = 0.22;
     }
+    if (acquiredSongBuffs.has('tangananica-tanganana') && subdivisionIndex === 0 && Math.random() < HORDE_BALANCE.tangananicaDirectionSwapChance) {
+      tangananicaSide = tangananicaSide === 'left' ? 'right' : 'left';
+    }
+  }),
+  eventBus.on('OnSuperiorStepUnleashed', ({ completedStep, position }) => {
+    if (acquiredSongBuffs.has('la-senora-interesante')) summonSenoraDecoy();
+    if (acquiredSongBuffs.has('dinosaurio-anacleto') && anacletoCooldown <= 0) summonAnacletoMeteor(position);
+    if (completedStep === 'Remate') nextStepLabel.textContent = 'Remate';
   }),
   eventBus.on('OnLevelUpReady', ({ choices }) => showUpgradeChoices(choices)),
   eventBus.on('OnGamePauseChanged', ({ paused, reason }) => {
     if (reason !== 'LevelUp') return;
     levelUpPaused = paused;
     levelUpOverlay.hidden = !paused;
+  }),
+  eventBus.on('OnScaleTierChanged', () => clearBuffs()),
+  eventBus.on('OnGameStateChanged', ({ current }) => {
+    if (current === 'MainMenu' || current === 'CharacterSelect' || current === 'Victory' || current === 'GameOver') {
+      clearBuffs();
+      clearSongBuffObjects();
+    }
   }),
 ];
 
@@ -162,20 +230,35 @@ window.addEventListener('beforeunload', dispose, { once: true });
 requestId = requestAnimationFrame(frame);
 
 interface EnemyView {
+  id: string;
   root: THREE.Group;
   kind: LevelOneEnemyKind;
+  currentHealth: number;
+  maxHealth: number;
+  healthBar: THREE.Group;
+  healthFill: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  damage: number;
+  shotCadence: number;
   fireTimer: number;
   telegraph: number;
+  danceSeconds: number;
+  infectionSeconds: number;
+  infectionTick: number;
+  infected: boolean;
   warning: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
 }
-interface Projectile { mesh: THREE.Mesh; velocity: THREE.Vector3 }
+interface Projectile { mesh: THREE.Mesh; velocity: THREE.Vector3; damage: number }
+type FoodKind = 'completo' | 'sopaipilla' | 'empanada';
+interface FoodPickup { root: THREE.Group; kind: FoodKind }
+interface ZombieAlly { root: THREE.Group; health: number; attackCooldown: number }
+interface MeteorStrike { mesh: THREE.Mesh; position: Vector2XZ; elapsed: number; impacted: boolean }
 
 function spawnEnemy(kind: LevelOneEnemyKind): void {
   const index = enemyViews.size;
   const angle = (index * 2.399 + elapsed * 0.42) % (Math.PI * 2);
   const radius = HORDE_BALANCE.spawnRadius - (index % 2) * 1.2;
   const position = { x: Math.cos(angle) * radius, z: Math.sin(angle) * radius };
-  const enemy = horde.spawnEnemy(kind, position);
+  const enemy = horde.spawnEnemy(kind, position, undefined, playerLevel);
   const root = createOfficer(kind);
   root.position.set(position.x, 0, position.z);
   const warning = new THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>(
@@ -185,8 +268,32 @@ function spawnEnemy(kind: LevelOneEnemyKind): void {
   warning.rotation.x = -Math.PI / 2;
   warning.position.y = 0.09;
   root.add(warning);
+  const healthBar = new THREE.Group();
+  healthBar.position.y = 2.05;
+  const healthBack = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.04, 0.13),
+    new THREE.MeshBasicMaterial({ color: '#211a18', transparent: true, opacity: 0.9, depthTest: false, depthWrite: false }),
+  );
+  const healthFill = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.96, 0.075),
+    new THREE.MeshBasicMaterial({ color: '#d45c45', depthTest: false, depthWrite: false }),
+  );
+  healthFill.position.z = 0.008;
+  healthBar.add(healthBack, healthFill);
+  root.add(healthBar);
   scene.add(root);
-  enemyViews.set(enemy.id, { root, kind, fireTimer: 1.1 + Math.random() * 1.4, telegraph: -1, warning });
+  const shotCadence = kind === 'fast' ? HORDE_BALANCE.fastShotEverySeconds
+    : kind === 'heavy' ? HORDE_BALANCE.heavyShotEverySeconds
+      : kind === 'tactical' ? HORDE_BALANCE.tacticalShotEverySeconds : HORDE_BALANCE.enemyShotEverySeconds;
+  enemyViews.set(enemy.id, { id: enemy.id, root, kind, currentHealth: enemy.health, maxHealth: enemy.maxHealth, healthBar, healthFill, damage: enemy.damage, shotCadence, fireTimer: 0.5 + Math.random() * 0.5, telegraph: -1, danceSeconds: 0, infectionSeconds: 0, infectionTick: 0, infected: false, warning });
+}
+
+function updateEnemyHealthBar(view: EnemyView, remainingHealth: number): void {
+  view.currentHealth = remainingHealth;
+  const ratio = Math.max(0, Math.min(1, remainingHealth / view.maxHealth));
+  view.healthFill.scale.x = ratio;
+  view.healthFill.position.x = -0.48 * (1 - ratio);
+  if (!view.infected) view.healthFill.material.color.lerpColors(enemyHealthEmptyColor, enemyHealthFullColor, ratio);
 }
 
 function frame(now: number): void {
@@ -202,6 +309,11 @@ function frame(now: number): void {
     vueltaCooldown = Math.max(0, vueltaCooldown - dt);
     invulnerableFor = Math.max(0, invulnerableFor - dt);
     dashFor = Math.max(0, dashFor - dt);
+    updateBuffTimers(dt);
+    rinRinCooldown = Math.max(0, rinRinCooldown - dt);
+    if (rinRinSeconds > 0) rinRinSeconds = Math.max(0, rinRinSeconds - dt);
+    anacletoCooldown = Math.max(0, anacletoCooldown - dt);
+    munecaCooldown = Math.max(0, munecaCooldown - dt);
 
     if (vueltaActive) updateVuelta(dt);
     else movePlayer(dt);
@@ -209,6 +321,10 @@ function frame(now: number): void {
     director.update(dt, enemyViews.size);
     updateEnemies(dt);
     updateProjectiles(dt);
+    updateFoodPickups(dt);
+    updateSongBuffs(dt);
+    updateAllies(dt);
+    updateMeteorStrikes(dt);
   }
   updateCamera();
   updateHud();
@@ -224,7 +340,7 @@ function movePlayer(dt: number): void {
   );
   if (move.lengthSq() > 0) {
     move.normalize();
-    const speed = dashFor > 0 ? HORDE_BALANCE.dashSpeed : 6.5;
+    const speed = dashFor > 0 ? HORDE_BALANCE.dashSpeed : 6.5 * (rinRinSeconds > 0 ? HORDE_BALANCE.rinRinSpeedMultiplier : 1);
     player.position.addScaledVector(move, speed * dt);
     player.rotation.y = Math.atan2(-move.x, -move.z);
   }
@@ -236,14 +352,36 @@ function movePlayer(dt: number): void {
 
 function updateEnemies(dt: number): void {
   for (const view of enemyViews.values()) {
-    const dx = player.position.x - view.root.position.x;
-    const dz = player.position.z - view.root.position.z;
+    const target = senoraSeconds > 0 && decoyRoot ? decoyRoot.position : player.position;
+    const dx = target.x - view.root.position.x;
+    const dz = target.z - view.root.position.z;
     const distance = Math.max(0.001, Math.hypot(dx, dz));
     view.root.rotation.y = Math.atan2(-dx, -dz);
+    view.healthBar.rotation.y = Math.atan2(camera.position.x - view.root.position.x, camera.position.z - view.root.position.z) - view.root.rotation.y;
+
+    if (view.infectionSeconds > 0) {
+      view.infectionSeconds = Math.max(0, view.infectionSeconds - dt);
+      view.infectionTick -= dt;
+      if (view.infectionTick <= 0 && view.infectionSeconds > 0) {
+        view.infectionTick += HORDE_BALANCE.zombieInfectionTickSeconds;
+        horde.damageArea({ x: view.root.position.x, z: view.root.position.z }, 0.15, HORDE_BALANCE.zombieInfectionDamage, 'ZombieInfection');
+      }
+      if (view.infectionSeconds === 0) {
+        view.infected = false;
+        updateEnemyHealthBar(view, view.currentHealth);
+      }
+    }
+
+    if (view.danceSeconds > 0) {
+      view.danceSeconds = Math.max(0, view.danceSeconds - dt);
+      view.root.rotation.y += Math.sin(elapsed * 20) * 0.07;
+      continue;
+    }
     if (distance > 7.5) {
       view.root.position.x += (dx / distance) * HORDE_BALANCE.enemySpeed * dt;
       view.root.position.z += (dz / distance) * HORDE_BALANCE.enemySpeed * dt;
     }
+    horde.updateEnemyPosition(view.id, { x: view.root.position.x, z: view.root.position.z });
 
     if (view.telegraph >= 0) {
       view.telegraph -= dt;
@@ -269,8 +407,10 @@ function fireAtPlayer(view: EnemyView, dx: number, dz: number, distance: number)
   const mesh = new THREE.Mesh(shotGeometry, shotMaterial);
   mesh.position.set(view.root.position.x, 1.05, view.root.position.z);
   scene.add(mesh);
-  projectiles.push({ mesh, velocity: direction.multiplyScalar(HORDE_BALANCE.projectileSpeed) });
-  view.fireTimer = HORDE_BALANCE.enemyShotEverySeconds + Math.random() * 0.65;
+  const tacticalAngle = view.kind === 'tactical' ? (Math.random() - 0.5) * 0.24 : 0;
+  direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), tacticalAngle);
+  projectiles.push({ mesh, velocity: direction.multiplyScalar(HORDE_BALANCE.projectileSpeed), damage: view.damage });
+  view.fireTimer = view.shotCadence + Math.random() * 0.45;
   lastRhythmShot = elapsed;
   strongBeatWindow = 0;
 }
@@ -279,18 +419,40 @@ function updateProjectiles(dt: number): void {
   for (let index = projectiles.length - 1; index >= 0; index -= 1) {
     const projectile = projectiles[index];
     projectile.mesh.position.addScaledVector(projectile.velocity, dt);
+    let hitAlly = false;
+    for (let allyIndex = zombieAllies.length - 1; allyIndex >= 0; allyIndex -= 1) {
+      const ally = zombieAllies[allyIndex];
+      const allyDx = projectile.mesh.position.x - ally.root.position.x;
+      const allyDz = projectile.mesh.position.z - ally.root.position.z;
+      if (allyDx * allyDx + allyDz * allyDz >= 0.42) continue;
+      ally.health -= projectile.damage;
+      if (ally.health <= 0) {
+        scene.remove(ally.root);
+        disposeObject(ally.root);
+        zombieAllies.splice(allyIndex, 1);
+      }
+      removeProjectile(index);
+      hitAlly = true;
+      break;
+    }
+    if (hitAlly) continue;
     const dx = projectile.mesh.position.x - player.position.x;
     const dz = projectile.mesh.position.z - player.position.z;
     if (dx * dx + dz * dz < 0.68) {
       if (vueltaActive) showToast('¡La vuelta desvió el disparo!');
       else if (invulnerableFor <= 0 && dashFor <= 0) {
-        playerHealth = Math.max(0, playerHealth - HORDE_BALANCE.projectileDamage);
+        const permanentReduction = permanentDamageReduction();
+        const foodReduction = completoSeconds > 0 ? HORDE_BALANCE.completoDamageReduction : 0;
+        const reduction = Math.min(0.5, permanentReduction + foodReduction);
+        playerHealth = Math.max(0, playerHealth - Math.max(1, Math.round(projectile.damage * (1 - reduction))));
         invulnerableFor = HORDE_BALANCE.playerHitInvulnerabilitySeconds;
         showToast('¡Te llegó un disparo! Sigue moviéndote');
         if (playerHealth === 0) {
           alive = false;
           director.finish();
-          status.textContent = `Fin de la partida · sobreviviste hasta la oleada ${director.snapshot.wave}.`;
+          clearBuffs();
+          clearSongBuffObjects();
+          status.textContent = `Fin de la partida · derrotaste ${director.snapshot.defeated} oficiales.`;
         }
       }
       removeProjectile(index);
@@ -556,12 +718,12 @@ function updateCamera(): void {
 
 function updateHud(): void {
   const wave = director.snapshot;
-  waveLabel.textContent = `Oleada ${wave.wave}`;
-  waveCount.textContent = wave.breakSecondsRemaining > 0
-    ? `Plaza despejada · siguiente en ${Math.ceil(wave.breakSecondsRemaining)} s`
-    : `Enemigos ${enemyViews.size} activos · ${wave.spawned} / ${wave.total} enviados`;
-  healthValue.textContent = `${playerHealth}%`;
-  healthFill.style.width = `${playerHealth}%`;
+  waveLabel.textContent = 'Nivel 1';
+  waveCount.textContent = wave.complete
+    ? 'Nivel completado · 15 / 15 oficiales'
+    : `Oficiales derrotados: ${wave.defeated} / ${wave.total} · ${enemyViews.size} activos`;
+  healthValue.textContent = `${playerHealth} / ${HORDE_BALANCE.playerHealth}`;
+  healthFill.style.width = `${playerHealth / HORDE_BALANCE.playerHealth * 100}%`;
   levelValue.textContent = `Nivel ${playerLevel}`;
   experienceValue.textContent = `${experience} / ${experienceThreshold()}`;
   experienceFill.style.width = `${Math.min(100, (experience / experienceThreshold()) * 100)}%`;
@@ -569,7 +731,20 @@ function updateHud(): void {
   skillFill.style.width = `${Math.min(100, skillCharge * 100)}%`;
   zapateoLevelLabel.textContent = `Zapateo ${upgradeLevels.zapateo === 0 ? 'base' : `Niv. ${upgradeLevels.zapateo}`}`;
   escobilladoLevelLabel.textContent = `Escobillado ${upgradeLevels.escobillado === 0 ? 'base' : `Niv. ${upgradeLevels.escobillado}`}`;
-  if (alive && wave.breakSecondsRemaining === 0) status.textContent = `Derribados: ${score} · máximo ${HORDE_BALANCE.maximumAlive} enemigos a la vez.`;
+  const activeBuffs = [
+    `Crecimiento ${Math.round(growthStacks * HORDE_BALANCE.growthPerOfficerKill * 100)}% · resistencia ${Math.round(permanentDamageReduction() * 100)}%`,
+    completoSeconds > 0 ? `Completo ${Math.ceil(completoSeconds)}s · tamaño y resistencia` : '',
+    empanadaSeconds > 0 ? `Empanada ${Math.ceil(empanadaSeconds)}s · daño aumentado` : '',
+    rinRinSeconds > 0 ? `Rin Rin Raja ${Math.ceil(rinRinSeconds)}s · rápido e invulnerable` : '',
+    senoraSeconds > 0 ? `La señora interesante ${Math.ceil(senoraSeconds)}s` : '',
+    acquiredSongBuffs.has('tangananica-tanganana') ? `Tangananica · ${tangananicaSide}` : '',
+    acquiredSongBuffs.size > 0 ? `Mejoras 31 Minutos: ${[...acquiredSongBuffs].map(songBuffTitle).join(', ')}` : '',
+  ].filter(Boolean);
+  buffStatus.textContent = activeBuffs.join(' · ');
+  buffAura.visible = activeBuffs.length > 0 && (growthStacks > 0 || completoSeconds > 0 || empanadaSeconds > 0 || rinRinSeconds > 0);
+  (buffAura.material as THREE.MeshBasicMaterial).color.set(empanadaSeconds > 0 ? '#f18a54' : rinRinSeconds > 0 ? '#6bd5d8' : '#95ca79');
+  if (alive && wave.complete) status.textContent = '¡Nivel completado! Derrotaste a los 15 oficiales.';
+  else if (alive && !levelUpPaused) status.textContent = `Derribados: ${wave.defeated} · máximo ${HORDE_BALANCE.maximumAlive} oficiales activos.`;
 }
 
 function resetRun(): void {
@@ -579,15 +754,20 @@ function resetRun(): void {
   horde.dispose();
   for (const view of enemyViews.values()) { scene.remove(view.root); disposeObject(view.root); }
   enemyViews.clear();
+  for (const pickup of foodPickups.values()) { scene.remove(pickup.root); disposeObject(pickup.root); }
+  foodPickups.clear();
+  clearSongBuffObjects();
+  acquiredSongBuffs.clear();
   for (const projectile of projectiles) scene.remove(projectile.mesh);
   projectiles.length = 0;
   horde = new HordeLevelOne(eventBus, getAttackDirection);
   director = new HordeDirector(spawnEnemy);
+  configureHordeBuffs();
   player.position.set(0, 0, 0);
   playerHealth = HORDE_BALANCE.playerHealth;
-  score = 0;
   playerLevel = 1;
   experience = 0;
+  growthStacks = 0;
   skillCharge = 0;
   upgradeLevels = { zapateo: 0, escobillado: 0, vuelta: 0 };
   horde.setUpgradeLevels(upgradeLevels);
@@ -599,6 +779,13 @@ function resetRun(): void {
   vueltaDuration = HORDE_BALANCE.vueltaDurationSeconds;
   vueltaActive = false;
   vueltaShield.visible = false;
+  clearBuffs();
+  guacalaCooldown = HORDE_BALANCE.guacalaIntervalSeconds;
+  munecaCooldown = 0;
+  anacletoCooldown = 0;
+  tangananicaSide = 'right';
+  foodDropChance = HORDE_BALANCE.foodBaseDropChance;
+  everDroppedFood = false;
   activeCuecaMove = null;
   attackMarker.visible = false;
   sweepMarker.visible = sweepOutline.visible = false;
@@ -616,6 +803,115 @@ function showToast(message: string): void {
   toastTimer = window.setTimeout(() => toast.classList.remove('visible'), 1100);
 }
 
+function maybeDropFood(enemyId: string, position: THREE.Vector3): void {
+  if (foodPickups.size >= HORDE_BALANCE.maximumFoodPickups) return;
+  const defeated = director.snapshot.defeated;
+  const guaranteed = !everDroppedFood && defeated === HORDE_BALANCE.firstWaveCount - 1;
+  const drops = guaranteed || Math.random() < foodDropChance;
+  if (!drops) {
+    foodDropChance = Math.min(HORDE_BALANCE.foodDropChanceMaximum, foodDropChance + HORDE_BALANCE.foodDropChanceStep);
+    return;
+  }
+  foodDropChance = HORDE_BALANCE.foodBaseDropChance;
+  everDroppedFood = true;
+  const kinds: FoodKind[] = ['completo', 'sopaipilla', 'empanada'];
+  const kind = kinds[Math.floor(Math.random() * kinds.length)];
+  spawnFoodPickup(`${enemyId}-food`, kind, { x: position.x + (Math.random() - 0.5) * 1.2, z: position.z + (Math.random() - 0.5) * 1.2 });
+  showToast(`¡Apareció ${foodName(kind)}! Recógela`);
+}
+
+function spawnFoodPickup(id: string, kind: FoodKind, position: Vector2XZ): void {
+  if (foodPickups.size >= HORDE_BALANCE.maximumFoodPickups) return;
+  const root = createFoodPickup(kind);
+  root.position.set(position.x, 0.45, position.z);
+  scene.add(root);
+  foodPickups.set(id, { root, kind });
+}
+
+function createFoodPickup(kind: FoodKind): THREE.Group {
+  const root = new THREE.Group();
+  const color = kind === 'completo' ? '#e5a74e' : kind === 'sopaipilla' ? '#d98a3d' : '#d4b56f';
+  const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.08, 20), new THREE.MeshStandardMaterial({ color: '#e8dfca', roughness: 0.65 }));
+  plate.position.y = -0.17;
+  root.add(plate);
+  const food = new THREE.Mesh(
+    kind === 'completo' ? new THREE.CapsuleGeometry(0.18, 0.54, 4, 8) : new THREE.SphereGeometry(0.32, 10, 7),
+    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.22, flatShading: true }),
+  );
+  food.position.y = 0.06;
+  if (kind === 'completo') food.rotation.z = Math.PI / 2;
+  root.add(food);
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(0.53, 0.035, 6, 24), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8 }));
+  halo.rotation.x = Math.PI / 2;
+  root.add(halo);
+  return root;
+}
+
+function updateFoodPickups(dt: number): void {
+  for (const [id, pickup] of foodPickups) {
+    pickup.root.rotation.y += dt * 1.1;
+    pickup.root.position.y = 0.42 + Math.sin(elapsed * 3 + id.length) * 0.09;
+    const dx = pickup.root.position.x - player.position.x;
+    const dz = pickup.root.position.z - player.position.z;
+    if (dx * dx + dz * dz > 1.25) continue;
+    applyFood(pickup.kind);
+    scene.remove(pickup.root);
+    disposeObject(pickup.root);
+    foodPickups.delete(id);
+  }
+}
+
+function applyFood(kind: FoodKind): void {
+  if (kind === 'sopaipilla') {
+    const recovered = Math.min(HORDE_BALANCE.sopaipillaHeal, HORDE_BALANCE.playerHealth - playerHealth);
+    playerHealth += recovered;
+    showToast(recovered > 0 ? `Sopaipilla: +${recovered} de vida` : 'Sopaipilla: ya tienes la vida completa');
+    return;
+  }
+  if (kind === 'completo') {
+    completoSeconds = HORDE_BALANCE.foodBuffDurationSeconds;
+    updatePlayerGrowthVisual();
+    eventBus.emit('OnConsumableConsumed', { consumableId: 'completo-italiano' });
+    showToast('Completo: más grande y resistente por 30 s');
+    return;
+  }
+  empanadaSeconds = HORDE_BALANCE.foodBuffDurationSeconds;
+  horde.setPlayerDamageMultiplier(HORDE_BALANCE.empanadaDamageMultiplier);
+  showToast('Empanada: +50% de daño por 30 s');
+}
+
+function updateBuffTimers(dt: number): void {
+  if (completoSeconds > 0) {
+    completoSeconds = Math.max(0, completoSeconds - dt);
+    if (completoSeconds === 0) updatePlayerGrowthVisual();
+  }
+  if (empanadaSeconds > 0) {
+    empanadaSeconds = Math.max(0, empanadaSeconds - dt);
+    if (empanadaSeconds === 0) horde.setPlayerDamageMultiplier(1);
+  }
+}
+
+function clearBuffs(): void {
+  completoSeconds = 0;
+  empanadaSeconds = 0;
+  rinRinSeconds = 0;
+  updatePlayerGrowthVisual();
+  horde.setPlayerDamageMultiplier(1);
+}
+
+function updatePlayerGrowthVisual(): void {
+  const permanentScale = 1 + growthStacks * HORDE_BALANCE.growthPerOfficerKill;
+  player.scale.setScalar(permanentScale * (completoSeconds > 0 ? HORDE_BALANCE.completoScaleMultiplier : 1));
+}
+
+function permanentDamageReduction(): number {
+  return Math.min(HORDE_BALANCE.permanentResistanceMaximum, growthStacks * HORDE_BALANCE.resistancePerOfficerKill);
+}
+
+function foodName(kind: FoodKind): string {
+  return kind === 'completo' ? 'un completo' : kind === 'sopaipilla' ? 'una sopaipilla' : 'una empanada';
+}
+
 function experienceThreshold(): number {
   return HORDE_BALANCE.experienceBaseThreshold + (playerLevel - 1) * HORDE_BALANCE.experienceThresholdPerLevel;
 }
@@ -631,22 +927,32 @@ function grantExperience(amount: number): void {
 }
 
 function buildUpgradeChoices(): [UpgradeChoice, UpgradeChoice, UpgradeChoice] {
-  const definitions: Array<{ id: 'zapateo' | 'escobillado' | 'vuelta'; name: string; description: string }> = [
+  const baseChoices: Array<{ id: 'zapateo' | 'escobillado' | 'vuelta'; name: string; description: string }> = [
     { id: 'zapateo', name: 'Zapateo sísmico', description: 'Aumenta el daño y el radio del pisotón.' },
     { id: 'escobillado', name: 'Escobillado envolvente', description: 'Alarga el barrido y amplía su arco frontal.' },
     { id: 'vuelta', name: 'Vuelta protectora', description: 'Mantiene un poco más el escudo mientras completas el círculo.' },
   ];
-  return definitions.map(({ id, name, description }) => {
-    const currentLevel = upgradeLevels[id];
-    const capped = currentLevel >= HORDE_BALANCE.maximumUpgradeLevel;
-    return {
-      id,
-      name: capped ? `${name} · al máximo` : name,
-      description: capped ? 'Esta mejora ya alcanzó su nivel máximo.' : description,
-      currentLevel,
-      nextLevel: capped ? currentLevel : currentLevel + 1,
-    };
-  }) as [UpgradeChoice, UpgradeChoice, UpgradeChoice];
+  const candidates: UpgradeChoice[] = baseChoices
+    .filter(({ id }) => upgradeLevels[id] < HORDE_BALANCE.maximumUpgradeLevel)
+    .map(({ id, name, description }) => ({ id, name, description, currentLevel: upgradeLevels[id], nextLevel: upgradeLevels[id] + 1 }));
+  const songs: Array<{ id: SongBuffId; name: string; description: string }> = [
+    { id: 'la-senora-interesante', name: 'La señora interesante', description: 'Tu habilidad superior invoca un señuelo que distrae a los oficiales.' },
+    { id: 'baila-sin-cesar', name: 'Baila sin cesar', description: 'Cada golpe hace bailar y detiene al oficial durante medio segundo.' },
+    { id: 'rin-rin-raja', name: 'Rin Rin Raja', description: 'Los ataques por la espalda dan velocidad e invulnerabilidad breves.' },
+    { id: 'tangananica-tanganana', name: 'Tangananica-Tanganana', description: 'Atacar por el lado activo aumenta el daño; puede cambiar en cada compás.' },
+    { id: 'dinosaurio-anacleto', name: 'Dinosaurio Anacleto', description: 'Tu habilidad superior en Remate llama un meteorito explosivo.' },
+    { id: 'guacala', name: 'Guacala', description: 'Genera una comida chilena aleatoria cada 35 segundos.' },
+    { id: 'mi-muneca-me-hablo', name: 'Mi muñeca me habló', description: 'Una muñeca orbita y replica tus ataques con daño reducido.' },
+    { id: 'arwrarwrirwrarwro', name: 'Arwrarwrirwrarwro', description: 'Dos zombies aliados atacan e infectan enemigos ocasionalmente.' },
+  ];
+  for (const song of songs) {
+    if (!acquiredSongBuffs.has(song.id)) candidates.push({ ...song, currentLevel: 0, nextLevel: 1 });
+  }
+  for (let index = candidates.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [candidates[index], candidates[swapIndex]] = [candidates[swapIndex], candidates[index]];
+  }
+  return candidates.slice(0, 3) as [UpgradeChoice, UpgradeChoice, UpgradeChoice];
 }
 
 function showUpgradeChoices(choices: [UpgradeChoice, UpgradeChoice, UpgradeChoice]): void {
@@ -671,12 +977,265 @@ function handleUpgradeChoiceClick(event: MouseEvent): void {
   if (id === 'zapateo') upgradeLevels.zapateo = Math.min(HORDE_BALANCE.maximumUpgradeLevel, upgradeLevels.zapateo + 1);
   else if (id === 'escobillado') upgradeLevels.escobillado = Math.min(HORDE_BALANCE.maximumUpgradeLevel, upgradeLevels.escobillado + 1);
   else if (id === 'vuelta') upgradeLevels.vuelta = Math.min(HORDE_BALANCE.maximumUpgradeLevel, upgradeLevels.vuelta + 1);
+  else if (isSongBuffId(id)) {
+    acquiredSongBuffs.add(id);
+    activateSongBuff(id);
+  }
   else return;
 
   horde.setUpgradeLevels(upgradeLevels);
+  configureHordeBuffs();
   eventBus.emit('OnGamePauseChanged', { paused: false, reason: 'LevelUp' });
   showToast(`Mejora aplicada · ${button.querySelector('strong')?.textContent ?? 'Cueca'}`);
   if (experience >= experienceThreshold()) grantExperience(0);
+}
+
+const songBuffIds: readonly SongBuffId[] = [
+  'la-senora-interesante', 'baila-sin-cesar', 'rin-rin-raja', 'tangananica-tanganana',
+  'dinosaurio-anacleto', 'guacala', 'mi-muneca-me-hablo', 'arwrarwrirwrarwro',
+];
+
+function isSongBuffId(id: string | undefined): id is SongBuffId {
+  return id !== undefined && songBuffIds.includes(id as SongBuffId);
+}
+
+function configureHordeBuffs(): void {
+  horde.setDamageBonus((enemy, source) => {
+    if (!acquiredSongBuffs.has('tangananica-tanganana') || (!source.startsWith('BasicStep:') && !source.startsWith('SuperiorStep:'))) return 1;
+    return isOnTangananicaSide(enemy.position) ? HORDE_BALANCE.tangananicaDamageMultiplier : 1;
+  });
+}
+
+function isOnTangananicaSide(position: Vector2XZ): boolean {
+  const rightX = Math.cos(player.rotation.y);
+  const rightZ = -Math.sin(player.rotation.y);
+  const side = (position.x - player.position.x) * rightX + (position.z - player.position.z) * rightZ;
+  return tangananicaSide === 'right' ? side >= 0 : side <= 0;
+}
+
+function isBehindOfficer(view: EnemyView): boolean {
+  const towardPlayerX = player.position.x - view.root.position.x;
+  const towardPlayerZ = player.position.z - view.root.position.z;
+  const forwardX = -Math.sin(view.root.rotation.y);
+  const forwardZ = -Math.cos(view.root.rotation.y);
+  return towardPlayerX * forwardX + towardPlayerZ * forwardZ < -0.35;
+}
+
+function activateSongBuff(id: SongBuffId): void {
+  if (id === 'tangananica-tanganana') {
+    tangananicaSide = Math.random() < 0.5 ? 'left' : 'right';
+    configureHordeBuffs();
+  } else if (id === 'guacala') {
+    guacalaCooldown = HORDE_BALANCE.guacalaIntervalSeconds;
+  } else if (id === 'mi-muneca-me-hablo') {
+    munecaRoot = createMuneca();
+    scene.add(munecaRoot);
+  } else if (id === 'arwrarwrirwrarwro') {
+    for (let index = 0; index < HORDE_BALANCE.zombieCount; index += 1) {
+      const root = createZombieAlly();
+      root.position.set(player.position.x + (index ? 1 : -1), 0, player.position.z + 1.2);
+      scene.add(root);
+      zombieAllies.push({ root, health: 18, attackCooldown: 0.6 + index * 0.5 });
+    }
+  }
+  showToast(`Buff adquirido · ${songBuffTitle(id)}`);
+}
+
+function songBuffTitle(id: SongBuffId): string {
+  const titles: Record<SongBuffId, string> = {
+    'la-senora-interesante': 'La señora interesante',
+    'baila-sin-cesar': 'Baila sin cesar',
+    'rin-rin-raja': 'Rin Rin Raja',
+    'tangananica-tanganana': 'Tangananica-Tanganana',
+    'dinosaurio-anacleto': 'Dinosaurio Anacleto',
+    guacala: 'Guacala',
+    'mi-muneca-me-hablo': 'Mi muñeca me habló',
+    arwrarwrirwrarwro: 'Arwrarwrirwrarwro',
+  };
+  return titles[id];
+}
+
+function summonSenoraDecoy(): void {
+  if (!decoyRoot) {
+    const decoy = createSenoraDecoy();
+    decoyRoot = decoy;
+    scene.add(decoy);
+  }
+  const forward = getAttackDirection('Zapateo')!;
+  decoyRoot?.position.set(player.position.x + forward.x * HORDE_BALANCE.senoraDecoyDistance, 0, player.position.z + forward.z * HORDE_BALANCE.senoraDecoyDistance);
+  senoraSeconds = HORDE_BALANCE.senoraDecoyDurationSeconds;
+  showToast('La señora interesante distrae a los oficiales');
+}
+
+function createSenoraDecoy(): THREE.Group {
+  const root = new THREE.Group();
+  const skirt = new THREE.Mesh(new THREE.ConeGeometry(0.48, 1.1, 8), new THREE.MeshStandardMaterial({ color: '#b65c88', flatShading: true }));
+  skirt.position.y = 0.62; root.add(skirt);
+  const blouse = new THREE.Mesh(new THREE.SphereGeometry(0.34, 10, 8), new THREE.MeshStandardMaterial({ color: '#e8d1b6', flatShading: true }));
+  blouse.position.y = 1.18; root.add(blouse);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), new THREE.MeshStandardMaterial({ color: '#d29a75', flatShading: true }));
+  head.position.y = 1.68; root.add(head);
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.27, 8, 6), new THREE.MeshStandardMaterial({ color: '#432b2a', flatShading: true }));
+  hair.position.set(0, 1.78, -0.03); root.add(hair);
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.04, 6, 28), new THREE.MeshBasicMaterial({ color: '#efb7da', transparent: true, opacity: 0.9 }));
+  halo.rotation.x = Math.PI / 2; halo.position.y = 0.08; root.add(halo);
+  return root;
+}
+
+function clearSenoraDecoy(): void {
+  if (decoyRoot) {
+    scene.remove(decoyRoot);
+    disposeObject(decoyRoot);
+    decoyRoot = null;
+  }
+  senoraSeconds = 0;
+}
+
+function summonAnacletoMeteor(position: Vector2XZ): void {
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(0.72, 12, 9),
+    new THREE.MeshStandardMaterial({ color: '#e65f32', emissive: '#b33b17', emissiveIntensity: 1.6, flatShading: true }),
+  );
+  mesh.position.set(position.x, 13, position.z);
+  scene.add(mesh);
+  meteorStrikes.push({ mesh, position: { ...position }, elapsed: 0, impacted: false });
+  anacletoCooldown = 8;
+  showToast('Dinosaurio Anacleto: ¡meteorito!');
+}
+
+function createMuneca(): THREE.Group {
+  const root = new THREE.Group();
+  const dress = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.68, 7), new THREE.MeshStandardMaterial({ color: '#e8b8a1', flatShading: true }));
+  dress.position.y = 0.5; root.add(dress);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), new THREE.MeshStandardMaterial({ color: '#edcda8', flatShading: true }));
+  head.position.y = 0.98; root.add(head);
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.21, 8, 6), new THREE.MeshStandardMaterial({ color: '#523329', flatShading: true }));
+  hair.position.set(0, 1.07, -0.04); root.add(hair);
+  return root;
+}
+
+function createZombieAlly(): THREE.Group {
+  const root = new THREE.Group();
+  const skin = new THREE.MeshStandardMaterial({ color: '#87a16b', flatShading: true });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.58, 0.3), new THREE.MeshStandardMaterial({ color: '#5b6850', flatShading: true }));
+  body.position.y = 0.62; root.add(body);
+  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.22, 1), skin);
+  head.position.y = 1.08; root.add(head);
+  return root;
+}
+
+function updateSongBuffs(dt: number): void {
+  if (senoraSeconds > 0) {
+    senoraSeconds = Math.max(0, senoraSeconds - dt);
+    if (decoyRoot) decoyRoot.position.y = 0.05 + Math.sin(elapsed * 4) * 0.08;
+    if (senoraSeconds === 0) clearSenoraDecoy();
+  }
+  if (acquiredSongBuffs.has('guacala')) {
+    guacalaCooldown -= dt;
+    if (guacalaCooldown <= 0) {
+      if (foodPickups.size < HORDE_BALANCE.maximumFoodPickups) {
+        const kinds: FoodKind[] = ['completo', 'sopaipilla', 'empanada'];
+        const kind = kinds[Math.floor(Math.random() * kinds.length)];
+        spawnFoodPickup(`guacala-${Math.round(elapsed * 1000)}`, kind, { x: player.position.x + 1.5, z: player.position.z + 1.2 });
+        showToast('Guacala: apareció comida');
+      }
+      guacalaCooldown = HORDE_BALANCE.guacalaIntervalSeconds;
+    }
+  }
+}
+
+function updateAllies(dt: number): void {
+  if (munecaRoot) {
+    const angle = elapsed * 2.2;
+    munecaRoot.position.set(
+      player.position.x + Math.cos(angle) * HORDE_BALANCE.munecaOrbitRadius,
+      0.15 + Math.sin(elapsed * 4) * 0.08,
+      player.position.z + Math.sin(angle) * HORDE_BALANCE.munecaOrbitRadius,
+    );
+    munecaRoot.rotation.y = -angle;
+  }
+
+  for (const ally of zombieAllies) {
+    ally.attackCooldown = Math.max(0, ally.attackCooldown - dt);
+    const target = nearestEnemy(ally.root.position);
+    if (!target) {
+      ally.root.position.x += (player.position.x - ally.root.position.x) * Math.min(1, dt * 2);
+      ally.root.position.z += (player.position.z - ally.root.position.z) * Math.min(1, dt * 2);
+      continue;
+    }
+    const dx = target.root.position.x - ally.root.position.x;
+    const dz = target.root.position.z - ally.root.position.z;
+    const distance = Math.max(0.001, Math.hypot(dx, dz));
+    ally.root.rotation.y = Math.atan2(-dx, -dz);
+    if (distance > 1.4) {
+      ally.root.position.x += (dx / distance) * 3.2 * dt;
+      ally.root.position.z += (dz / distance) * 3.2 * dt;
+    } else if (ally.attackCooldown === 0) {
+      ally.attackCooldown = HORDE_BALANCE.zombieAttackCooldownSeconds;
+      horde.damageArea({ x: target.root.position.x, z: target.root.position.z }, 0.85, HORDE_BALANCE.zombieDamage, 'Arwrarwrirwrarwro');
+    }
+  }
+}
+
+function nearestEnemy(position: THREE.Vector3): EnemyView | undefined {
+  let closest: EnemyView | undefined;
+  let closestDistanceSquared = Number.POSITIVE_INFINITY;
+  for (const enemy of enemyViews.values()) {
+    const dx = enemy.root.position.x - position.x;
+    const dz = enemy.root.position.z - position.z;
+    const distanceSquared = dx * dx + dz * dz;
+    if (distanceSquared >= closestDistanceSquared) continue;
+    closest = enemy;
+    closestDistanceSquared = distanceSquared;
+  }
+  return closest;
+}
+
+function updateMeteorStrikes(dt: number): void {
+  for (let index = meteorStrikes.length - 1; index >= 0; index -= 1) {
+    const strike = meteorStrikes[index];
+    strike.elapsed += dt;
+    if (!strike.impacted) {
+      const progress = Math.min(1, strike.elapsed / HORDE_BALANCE.anacletoMeteorFlightSeconds);
+      strike.mesh.position.y = 13 * (1 - progress) + 0.5;
+      strike.mesh.scale.setScalar(0.7 + progress * 0.45);
+      if (progress < 1) continue;
+      strike.impacted = true;
+      strike.elapsed = 0;
+      strike.mesh.position.y = 0.5;
+      strike.mesh.scale.setScalar(3.5);
+      horde.damageArea(strike.position, HORDE_BALANCE.anacletoMeteorRadius, HORDE_BALANCE.anacletoMeteorDamage, 'Dinosaurio Anacleto');
+      continue;
+    }
+    if (strike.elapsed < 0.3) continue;
+    scene.remove(strike.mesh);
+    disposeObject(strike.mesh);
+    meteorStrikes.splice(index, 1);
+  }
+}
+
+function clearSongBuffObjects(): void {
+  clearSenoraDecoy();
+  rinRinSeconds = 0;
+  rinRinCooldown = 0;
+  munecaCooldown = 0;
+  anacletoCooldown = 0;
+  guacalaCooldown = HORDE_BALANCE.guacalaIntervalSeconds;
+  if (munecaRoot) {
+    scene.remove(munecaRoot);
+    disposeObject(munecaRoot);
+    munecaRoot = null;
+  }
+  for (const ally of zombieAllies) {
+    scene.remove(ally.root);
+    disposeObject(ally.root);
+  }
+  zombieAllies = [];
+  for (const strike of meteorStrikes) {
+    scene.remove(strike.mesh);
+    disposeObject(strike.mesh);
+  }
+  meteorStrikes = [];
 }
 
 function unleashSuperior(step: CuecaStep, position: Vector2XZ): void {
@@ -850,12 +1409,14 @@ function createHandkerchief(material: THREE.Material): THREE.Group {
 
 function createOfficer(kind: LevelOneEnemyKind): THREE.Group {
   const root = new THREE.Group();
-  const isPatrol = kind === 'patrulla-a-pie';
-  const uniform = new THREE.MeshStandardMaterial({ color: isPatrol ? '#344657' : '#405540', flatShading: true });
+  const isFast = kind === 'fast';
+  const isHeavy = kind === 'heavy';
+  const isTactical = kind === 'tactical';
+  const uniform = new THREE.MeshStandardMaterial({ color: isFast ? '#3f6677' : isHeavy ? '#514b42' : isTactical ? '#5b496b' : '#405540', flatShading: true });
   const skin = new THREE.MeshStandardMaterial({ color: '#bd8967', flatShading: true });
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.72, 0.34), uniform); body.position.y = 1.05; body.castShadow = true; root.add(body);
   const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.23, 1), skin); head.position.y = 1.58; root.add(head);
-  const hat = new THREE.Mesh(isPatrol ? new THREE.SphereGeometry(0.26, 8, 5) : new THREE.CylinderGeometry(0.2,0.22,0.12,7), uniform);
+  const hat = new THREE.Mesh(isFast ? new THREE.SphereGeometry(0.26, 8, 5) : new THREE.CylinderGeometry(isHeavy ? 0.25 : 0.2, isHeavy ? 0.27 : 0.22, isHeavy ? 0.17 : 0.12, 7), uniform);
   hat.position.y = 1.84; root.add(hat);
   for (const side of [-1,1]) {
     const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.095,0.55,6), uniform); leg.position.set(side*0.15,0.3,0); root.add(leg);
@@ -865,9 +1426,13 @@ function createOfficer(kind: LevelOneEnemyKind): THREE.Group {
   rifle.position.set(0.42,1.12,-0.47); root.add(rifle);
   const stock = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.17,0.23), new THREE.MeshStandardMaterial({ color: '#60442d' }));
   stock.position.set(0.42,1.12,-0.12); root.add(stock);
-  if (isPatrol) {
+  if (isHeavy) {
     const shield = new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.32,0.08,6), new THREE.MeshStandardMaterial({ color: '#67777a', metalness: 0.2 }));
     shield.position.set(-0.44,1.02,-0.12); shield.rotation.x = Math.PI/2; root.add(shield);
+  }
+  if (isTactical) {
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.12,0.36), new THREE.MeshStandardMaterial({ color: '#d0b563', emissive: '#735b22', emissiveIntensity: 0.25 }));
+    stripe.position.y = 1.22; root.add(stripe);
   }
   return root;
 }
@@ -885,6 +1450,9 @@ function dispose(): void {
   disposed = true; cancelAnimationFrame(requestId); clearTimeout(toastTimer);
   window.removeEventListener('keydown', onKeyDown); window.removeEventListener('resize', resize);
   for (const unsubscribe of unsubscribers) unsubscribe();
+  clearBuffs();
+  for (const pickup of foodPickups.values()) disposeObject(pickup.root);
+  foodPickups.clear();
   horde.dispose(); renderer.dispose();
 }
 function required<T extends HTMLElement>(id: string): T { const element = document.getElementById(id); if (!(element instanceof HTMLElement)) throw new Error(`Falta #${id} en preview.html`); return element as T; }

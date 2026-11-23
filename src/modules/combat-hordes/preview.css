@@ -28,6 +28,7 @@ h2 { margin-bottom: 2px; font: 600 24px 'Space Grotesk',sans-serif; }
 .health-label { display: flex; justify-content: space-between; margin-bottom: 7px; color: #e3d7c8; font-size: 11px; }
 .health-track { height: 9px; padding: 1px; border-radius: 9px; background: rgba(255,255,255,.12); overflow: hidden; }
 #health-fill { height: 100%; width: 100%; border-radius: inherit; background: linear-gradient(90deg,#a34d39,#e39b5e); transition: width .18s ease; }
+.buff-status { min-height: 27px; margin: 8px 0 0; color: #f1ce8b; font-size: 10px; line-height: 1.45; }
 .upgrade-summary { display: flex; justify-content: space-between; gap: 6px; margin-top: 10px; color: #d8c3a6; font-size: 9px; }
 .status { min-height: 42px; margin: 12px 0; color: #d3c5b2; font-size: 11px; line-height: 1.55; }
 .restart { width: 100%; padding: 10px 12px; border: 1px solid rgba(255,255,255,.14); border-radius: 10px; color: #fff2df; background: #71412f; cursor: pointer; }

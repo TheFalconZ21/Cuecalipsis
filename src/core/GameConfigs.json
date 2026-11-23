@@ -40,5 +40,8 @@
     { "id": "espuelas-relampago", "name": "Espuelas Relámpago", "description": "Descargas automáticas sincronizadas al pulso.", "statsByLevel": [null, null, null, null, null], "synergyWith": null }
   ],
   "poolCapacities": { "enemyProjectiles": 600, "playerProjectiles": 200, "enemies": 150, "apocalypseOrbs": 100 },
-  "audio": { "maxRepeatedSfxInstances": 5, "windowMs": 80, "pitchRange": [0.95, 1.05] }
+  "audio": { "maxRepeatedSfxInstances": 5, "windowMs": 80, "pitchRange": [0.95, 1.05] },
+  "consumables": {
+    "completo-italiano": { "growthMultiplier": 1.25, "durationSeconds": 30 }
+  }
 }
