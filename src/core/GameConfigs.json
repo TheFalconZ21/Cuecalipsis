@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "decisionStatus": {
-    "rhythmBpmConvention": "pending-dev1",
+    "rhythmBpmConvention": "agreed-dev1-dotted-quarter",
     "tierThresholdsAndBossGates": "pending-dev2",
     "hordeToTierMapping": "pending-dev2-and-dev3",
     "valuesBelowAreStartingProposals": true
@@ -9,11 +9,12 @@
   "characters": [
     { "id": "huaso-mc", "name": "Huaso MC", "archetype": "Hip Hop", "bpm": 100, "track": "assets/audio/huaso-mc.ogg", "enjundiaMultiplier": 1.0 },
     { "id": "huaso-tech", "name": "Huaso Tech", "archetype": "Electrónica", "bpm": 126, "track": "assets/audio/huaso-tech.ogg", "enjundiaMultiplier": 1.0 },
-    { "id": "huaso-tradicional", "name": "Huaso Tradicional", "archetype": "Cueca", "bpm": 138, "track": "assets/audio/huaso-tradicional.ogg", "enjundiaMultiplier": 1.0 },
+    { "id": "huaso-tradicional", "name": "Huaso Tradicional", "archetype": "Cueca", "bpm": 85, "track": "assets/audio/music/La Pena que Me Quema - 43s.mp3", "enjundiaMultiplier": 1.0 },
     { "id": "huaso-metalero", "name": "Huaso Metalero", "archetype": "Metal", "bpm": 165, "track": "assets/audio/huaso-metalero.ogg", "enjundiaMultiplier": 1.0 },
     { "id": "huaso-otaku", "name": "Huaso Otaku", "archetype": "Nightcore", "bpm": 182, "track": "assets/audio/huaso-otaku.ogg", "enjundiaMultiplier": 1.0 }
   ],
-  "rhythm": { "meter": "6/8", "subdivisionsPerBar": 6, "strongSubdivisions": [0, 3], "bpmConvention": null, "audioOffsetMs": 0, "judgementWindowsMs": { "perfect": 45, "good": 95 }, "missCooldownSeconds": 0.25 },
+  "rhythm": { "bpm": 85, "meter": "6/8", "subdivisionsPerBar": 6, "subdivisionsPerDottedQuarter": 3, "sectionDottedQuarterBeats": 8, "sectionNames": ["Media Luna", "Escobillado", "Zapateo", "Remate"], "strongSubdivisions": [0, 3], "validAttackSubdivisions": [0, 2, 4], "validAttackSubdivisionsStatus": "provisional-pending-track-validation", "bpmConvention": "dotted-quarter", "audioOffsetMs": 0, "judgementWindowsMs": { "perfect": 45, "good": 95 }, "damageMultipliers": { "perfect": 2.0, "good": 1.45, "miss": 0.2 }, "damageMultipliersStatus": "provisional", "missCooldownSeconds": 0.25, "playback": "once" },
+  "ultimateCharge": { "enemyDamagePercentPerPoint": 8, "enemyDefeatBonusPercent": 12, "propDestroyedPercent": 18, "valuesStatus": "provisional" },
   "scaleTiers": [
     { "tier": 1, "name": "Pueblo/Ciudad", "minScale": 1.0, "maxScale": 4.5, "maxTierApocalypse": null, "cameraDistance": null, "cameraFov": null, "speedFactor": null, "decisionPending": true },
     { "tier": 2, "name": "Metrópoli/Rascacielos", "minScale": 1.0, "maxScale": 4.5, "maxTierApocalypse": null, "cameraDistance": null, "cameraFov": null, "speedFactor": null, "decisionPending": true },

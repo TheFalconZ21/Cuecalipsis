@@ -10,9 +10,26 @@ export type CuecaStep = 'MediaLuna' | 'Escobillado' | 'Zapateo' | 'Remate';
 export type InputJudgement = 'PERFECT' | 'GOOD' | 'MISS';
 
 export interface Vector2XZ { x: number; z: number }
-export interface OnBeatPayload { subdivisionIndex: 0 | 1 | 2 | 3 | 4 | 5; isStrongBeat: boolean; beatProgress: number; audioTimeSeconds: number }
-export interface OnInputEvaluatedPayload { judgement: InputJudgement; offsetMs: number; skillChargeDelta: number; combo: number }
-export interface OnBasicStepAttackPayload { step: CuecaStep; judgement: Exclude<InputJudgement, 'MISS'>; position: Vector2XZ }
+export interface OnBeatPayload {
+  subdivisionIndex: 0 | 1 | 2 | 3 | 4 | 5;
+  isStrongBeat: boolean;
+  beatProgress: number;
+  audioTimeSeconds: number;
+  absoluteSubdivisionIndex?: number;
+  barIndex?: number;
+  sectionIndex?: number;
+  sectionName?: CuecaStep;
+  isValidAttack?: boolean;
+  bpm?: number;
+}
+export interface OnBeatScheduledPayload extends OnBeatPayload { targetAudioTimeSeconds: number }
+export interface OnSectionChangedPayload { sectionIndex: number; sectionName: CuecaStep; dottedQuarterBeatIndex: number; audioTimeSeconds: number }
+export interface OnAttackSlotsChangedPayload { subdivisions: Array<0 | 1 | 2 | 3 | 4 | 5> }
+export interface OnMusicTrackEndedPayload { audioTimeSeconds: number; finalSubdivisionIndex: number; finalSectionIndex: number }
+export interface OnSkillChargeChangedPayload { amount: number; total: number; source: 'EnemyDamage' | 'EnemyDefeated' | 'PropDestroyed' | 'SuperiorActivated' | 'Reset' }
+export interface OnInputEvaluatedPayload { judgement: InputJudgement; offsetMs: number; skillChargeDelta: number; combo: number; damageMultiplier?: number; targetAudioTimeSeconds?: number }
+export interface OnBasicStepAttackPayload { step: CuecaStep; judgement: Exclude<InputJudgement, 'MISS'>; position: Vector2XZ; damageMultiplier?: number }
+export interface OnWeakStepAttackPayload { step: CuecaStep; judgement: 'MISS'; position: Vector2XZ; damageMultiplier: number; offsetMs: number }
 export interface OnSuperiorStepUnleashedPayload { completedStep: CuecaStep; nextStep: CuecaStep; position: Vector2XZ }
 export interface OnApocalypseGainedPayload { amount: number; source: 'Enemy' | 'Prop'; total: number; tier: TierIndex }
 export interface OnBossGateTriggeredPayload { tier: TierIndex }
@@ -34,8 +51,15 @@ export interface OnGameStateChangedPayload { previous: GameState; current: GameS
 /** Mapa canónico de nombres a payloads utilizado por EventBus. */
 export interface GameEvents {
   OnBeat: OnBeatPayload;
+  OnBeatScheduled: OnBeatScheduledPayload;
+  OnAttackSlotsChanged: OnAttackSlotsChangedPayload;
+  OnMusicTrackEnded: OnMusicTrackEndedPayload;
+  OnSkillChargeChanged: OnSkillChargeChangedPayload;
+  OnSectionScheduled: OnSectionChangedPayload;
+  OnSectionChanged: OnSectionChangedPayload;
   OnInputEvaluated: OnInputEvaluatedPayload;
   OnBasicStepAttack: OnBasicStepAttackPayload;
+  OnWeakStepAttack: OnWeakStepAttackPayload;
   OnSuperiorStepUnleashed: OnSuperiorStepUnleashedPayload;
   OnApocalypseGained: OnApocalypseGainedPayload;
   OnBossGateTriggered: OnBossGateTriggeredPayload;

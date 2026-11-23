@@ -47,8 +47,10 @@ Estas decisiones reemplazan las recomendaciones anteriores que aparezcan en los 
 
 ## Pendiente antes de integrar
 
-- Confirmar el punto de loop de la pista tradicional definitiva y validar que el track mantenga los `85 BPM` acordados.
-- Elegir el motor del juego y adaptar `RhythmClock` al reloj DSP nativo, conservándolo como dueño único del tiempo musical.
-- Acordar con Dev 3 los tres índices iniciales de ataque con referencia a la melodía y la telemetría de ataques enemigos; con Dev 2, el evento de daño/destrucción de elementos del escenario.
-- Definir en `src/core/` el adaptador/eventos compartidos para `beatScheduled`, `beat`, `sectionScheduled`, `sectionChanged` y juicio de ataque, además de daño/destrucción, XP y carga de habilidad; acordar la semántica de pausa/reinicio.
-- Definir los multiplicadores de `GOOD`, `PERFECT` y `MISS`, la carga por daño/destrucción y las curvas de nivel en la configuración compartida.
+- Pista seleccionada: `assets/audio/music/La Pena que Me Quema - 43s.mp3`, `85 BPM`; se reproduce una vez y al terminar detiene el reloj. No se hace loop porque su duración (42,984 s) no es un múltiplo de las secciones de 5,647 s.
+- Los slots `[0, 2, 4]`, multiplicadores PERFECT `2x` / GOOD `1.45x` / MISS `0.2x` y carga `8%` por daño, `12%` por baja y `18%` por prop destruido quedan provisionales para el primer balance.
+- Integrar el reloj y `RhythmEventBridge` en el host de partida Three.js, conservándolo como dueño único del tiempo musical.
+- Validar con Dev 3 los slots de ataque y conectar `OnWeakStepAttack` para que los MISS causen daño reducido; el contrato ya está declarado, pero combate aún debe consumirlo.
+- Conectar `RhythmEventBridge` al host de partida pasando el paso de cueca actual, la posición del jugador y el handler de habilidad superior; `src/main.ts` sigue siendo el montaje 3D de ejemplo.
+- Conectar con Dev 2 la carga de habilidad por daño/destrucción de elementos del escenario y acordar la semántica global de pausa/reinicio.
+- Balancear los multiplicadores y carga provisionales contra el combate real; los valores iniciales viven en `GameConfigs.json`.

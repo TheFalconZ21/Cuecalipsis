@@ -19,6 +19,8 @@
     sectionNames: Object.freeze(["Media Luna", "Escobillado", "Zapateo", "Remate"]),
     scheduleAheadSeconds: 0.12,
     schedulerWakeMs: 8,
+    perfectDamageMultiplier: 2,
+    goodDamageMultiplier: 1.45,
     missDamageMultiplier: 0.2
   });
 
@@ -63,6 +65,14 @@
     get startAudioTime() { return this._epoch; }
     get validAttackSubdivisions() { return [...this._validAttackSubdivisions]; }
 
+    configure(overrides = {}) {
+      if (this._hasStarted) throw new Error("La configuración debe asignarse antes de iniciar el reloj");
+      this.config = Object.freeze({ ...this.config, ...overrides });
+      this.eighthSeconds = 60 / this.config.bpm / this.config.subdivisionsPerDottedQuarter;
+      this._validAttackSubdivisions = [...this.config.validAttackSubdivisions];
+      this._validateConfig();
+    }
+
     unlockAttackSlot(subdivisionIndex) {
       if (!Number.isInteger(subdivisionIndex) || subdivisionIndex < 0 || subdivisionIndex > 5) {
         throw new RangeError("El slot de ataque debe ser un índice entre 0 y 5");
@@ -96,6 +106,21 @@
       if (!buffer || typeof buffer.duration !== "number") throw new TypeError("Se esperaba un AudioBuffer");
       this._trackBuffer = buffer;
       this._trackOptions = { ...this._trackOptions, ...options };
+    }
+
+    async loadTrack(url, options = {}) {
+      if (this._hasStarted) throw new Error("Detén el reloj antes de cargar otra pista");
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) throw new Error("Este navegador no ofrece Web Audio");
+      this._context = this._context || new AudioContextClass();
+      await this._context.resume();
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`No se pudo cargar la pista (${response.status})`);
+      const buffer = await this._context.decodeAudioData(await response.arrayBuffer());
+      this.setTrackBuffer(buffer, options);
+      const track = { url, durationSeconds: buffer.duration, loop: Boolean(this._trackOptions.loop) };
+      this._emit("trackLoaded", track);
+      return track;
     }
 
     async start() {
@@ -155,6 +180,15 @@
       source.buffer = this._trackBuffer;
       source.loop = Boolean(this._trackOptions.loop);
       source.connect(this._context.destination);
+      source.onended = () => {
+        if (this._trackSource !== source) return;
+        this._trackSource = null;
+        if (source.loop || !this._running) return;
+        this._running = false;
+        clearTimeout(this._timer);
+        this._timer = null;
+        this._emit("trackEnded", { audioTime: this._context.currentTime, snapshot: this.getSnapshot() });
+      };
       source.start(this._epoch, this._trackOptions.offset || 0);
       this._trackSource = source;
     }
@@ -257,7 +291,8 @@
       const result = absoluteError <= this.config.perfectWindowMs ? "PERFECT"
         : absoluteError <= this.config.goodWindowMs ? "GOOD" : "MISS";
       const target = this._makeBeat(nearest.absoluteSubdivisionIndex, "target");
-      const damageMultiplier = result === "PERFECT" ? 2 : result === "GOOD" ? 1.45 : this.config.missDamageMultiplier;
+      const damageMultiplier = result === "PERFECT" ? this.config.perfectDamageMultiplier
+        : result === "GOOD" ? this.config.goodDamageMultiplier : this.config.missDamageMultiplier;
       const judgment = { result, errorMs: nearest.errorMs, target, inputAudioTime, damageMultiplier };
       this._emit("judgment", judgment);
       return judgment;
