@@ -1,40 +1,91 @@
-import * as THREE from 'three';
+import './cinematic.css';
+// Se prepara el reloj antes de que Inicio lo active con un gesto explícito del usuario.
+import './modules/rhythm-player/rhythm-audio-entry';
+import './modules/art-vfx-ui/MainMenuEntry';
 
-const app = document.querySelector<HTMLDivElement>('#app');
+const opening = required<HTMLElement>('opening-cinematic');
+const menuRoot = required<HTMLElement>('main-menu-root');
+const gameShell = required<HTMLElement>('game-shell');
+const openingStatus = required<HTMLElement>('opening-status');
+const playButton = required<HTMLButtonElement>('opening-play');
+const audioButton = required<HTMLButtonElement>('opening-audio');
+const skipButton = required<HTMLButtonElement>('opening-skip');
+const videos = [
+  required<HTMLVideoElement>('opening-video-first'),
+  required<HTMLVideoElement>('opening-video-second'),
+];
 
-if (!app) throw new Error('No se encontró el contenedor #app');
+let currentVideo = 0;
+let muted = true;
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color('#17120f');
-
-const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 100);
-camera.position.set(0, 3, 6);
-camera.lookAt(0, 0, 0);
-
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight);
-app.appendChild(renderer.domElement);
-
-const geometry = new THREE.IcosahedronGeometry(1, 0);
-const material = new THREE.MeshStandardMaterial({ color: '#d87936', flatShading: true });
-const huasoPlaceholder = new THREE.Mesh(geometry, material);
-huasoPlaceholder.position.y = 1;
-scene.add(huasoPlaceholder);
-scene.add(new THREE.HemisphereLight('#fff1d2', '#47352c', 2));
-
-const light = new THREE.DirectionalLight('#ffffff', 2.5);
-light.position.set(3, 5, 4);
-scene.add(light);
-
-function resize() {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+function updateAudioButton(): void {
+  audioButton.textContent = muted ? 'Activar sonido' : 'Silenciar sonido';
+  audioButton.setAttribute('aria-pressed', String(!muted));
+  for (const video of videos) video.muted = muted;
 }
 
-window.addEventListener('resize', resize);
-renderer.setAnimationLoop(() => {
-  huasoPlaceholder.rotation.y += 0.005;
-  renderer.render(scene, camera);
+function playCurrentVideo(): void {
+  const video = videos[currentVideo];
+  video.hidden = false;
+  video.currentTime = 0;
+  openingStatus.textContent = `Cinemática · Parte ${currentVideo + 1} de ${videos.length}`;
+  playButton.hidden = true;
+  void video.play().catch(() => {
+    openingStatus.textContent = 'El navegador necesita que inicies la reproducción.';
+    playButton.hidden = false;
+  });
+}
+
+function showMainMenu(): void {
+  for (const video of videos) video.pause();
+  opening.hidden = true;
+  menuRoot.hidden = false;
+}
+
+videos.forEach((video, index) => {
+  video.addEventListener('playing', () => {
+    if (index === currentVideo) playButton.hidden = true;
+  });
+  video.addEventListener('ended', () => {
+    if (index !== currentVideo) return;
+    currentVideo += 1;
+    if (currentVideo < videos.length) {
+      videos[index].hidden = true;
+      updateAudioButton();
+      playCurrentVideo();
+      return;
+    }
+    showMainMenu();
+  });
+  video.addEventListener('error', () => {
+    if (index !== currentVideo) return;
+    openingStatus.textContent = `No se pudo cargar la parte ${index + 1} de la cinemática. Puedes omitirla.`;
+    playButton.hidden = true;
+  });
 });
+
+audioButton.addEventListener('click', () => {
+  muted = !muted;
+  updateAudioButton();
+});
+playButton.addEventListener('click', playCurrentVideo);
+skipButton.addEventListener('click', showMainMenu);
+
+// Reiniciar la partida inicia de nuevo el flujo completo de cinemática y menú.
+gameShell.addEventListener('click', (event: MouseEvent) => {
+  if (!(event.target instanceof Element) || !event.target.closest('#restart')) return;
+  event.preventDefault();
+  event.stopPropagation();
+  window.location.reload();
+}, true);
+
+updateAudioButton();
+audioButton.disabled = false;
+skipButton.disabled = false;
+playCurrentVideo();
+
+function required<T extends HTMLElement>(id: string): T {
+  const element = document.getElementById(id);
+  if (!(element instanceof HTMLElement)) throw new Error(`Falta el elemento #${id}`);
+  return element as T;
+}

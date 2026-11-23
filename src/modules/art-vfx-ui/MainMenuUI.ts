@@ -35,14 +35,16 @@ export class MainMenuUI {
   private homeScreen(): string {
     return `
       <main class="cueca-menu__layout" aria-label="Menú principal">
+        <img class="cueca-menu__background" src="/menu/rural-background.avif" alt="" aria-hidden="true" />
         <div class="cueca-menu__sun" aria-hidden="true"></div>
+        <img class="cueca-menu__codex" src="/menu/codex-mark.png" alt="Codex" />
         <section class="cueca-menu__card">
-          <img class="cueca-menu__logo" src="/assets/ui/cuecalipsis-fiesta-chilena.webp" alt="Cuecalipsis" />
+          <img class="cueca-menu__logo" src="/menu/cuecalipsis-logo.jpeg" alt="Cuecalipsis" />
           <p class="cueca-menu__eyebrow">EL FIN DEL MUNDO, AL RITMO DE CUECA</p>
           <h1>La plaza está despierta.</h1>
           <p class="cueca-menu__copy">Junta la rueda. Que empiece el zapateo.</p>
           <div class="cueca-menu__actions">
-            <button class="cueca-menu__button cueca-menu__button--play" data-action="play">Play <span aria-hidden="true">↗</span></button>
+            <button class="cueca-menu__button cueca-menu__button--play" data-action="play">Iniciar juego <span aria-hidden="true">↗</span></button>
             <button class="cueca-menu__button" data-action="settings">Settings</button>
             <button class="cueca-menu__button cueca-menu__button--quiet" data-action="exit">Salir</button>
           </div>

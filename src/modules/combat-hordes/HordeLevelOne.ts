@@ -131,7 +131,8 @@ export class HordeLevelOne {
     const rangeFactor = attack.step === 'Zapateo'
       ? HORDE_BALANCE.zapateoUpgradeRangeFactor
       : HORDE_BALANCE.escobilladoUpgradeRangeFactor;
-    const radius = PROTOTYPE_DEFAULTS.attackRadius * (1 + upgradeLevel * rangeFactor);
+    const stepRangeMultiplier = attack.step === 'Escobillado' ? HORDE_BALANCE.escobilladoRangeMultiplier : 1;
+    const radius = PROTOTYPE_DEFAULTS.attackRadius * stepRangeMultiplier * (1 + upgradeLevel * rangeFactor);
     const direction = attack.step === 'Escobillado' ? this.getAttackDirection?.(attack.step) : undefined;
     const halfAngle = HORDE_BALANCE.escobilladoHalfAngleRadians + upgradeLevel * HORDE_BALANCE.escobilladoUpgradeWidthRadians;
 

@@ -303,12 +303,14 @@ function spawnEnemy(kind: LevelOneEnemyKind): void {
   healthBar.position.y = 2.05;
   const healthBack = new THREE.Mesh(
     new THREE.PlaneGeometry(1.04, 0.13),
-    new THREE.MeshBasicMaterial({ color: '#211a18', transparent: true, opacity: 0.9, depthTest: false, depthWrite: false }),
+    new THREE.MeshBasicMaterial({ color: '#211a18', depthTest: false, depthWrite: false }),
   );
+  healthBack.renderOrder = 20;
   const healthFill = new THREE.Mesh(
     new THREE.PlaneGeometry(0.96, 0.075),
     new THREE.MeshBasicMaterial({ color: enemyHealthFullColor, depthTest: false, depthWrite: false }),
   );
+  healthFill.renderOrder = 21;
   healthFill.position.z = 0.008;
   healthBar.add(healthBack, healthFill);
   root.add(healthBar);
@@ -540,9 +542,52 @@ function onKeyDown(event: KeyboardEvent): void {
   }
 }
 
+let zapateoAudioContext: AudioContext | null = null;
+
+function playZapateoSound(): void {
+  const AudioContextConstructor = window.AudioContext;
+  if (!AudioContextConstructor) return;
+
+  try {
+    if (!zapateoAudioContext || zapateoAudioContext.state === 'closed') {
+      zapateoAudioContext = new AudioContextConstructor();
+    }
+    const context = zapateoAudioContext;
+    const now = context.currentTime;
+    const thump = context.createOscillator();
+    const thumpGain = context.createGain();
+    thump.type = 'triangle';
+    thump.frequency.setValueAtTime(108, now);
+    thump.frequency.exponentialRampToValueAtTime(43, now + 0.16);
+    thumpGain.gain.setValueAtTime(0.0001, now);
+    thumpGain.gain.exponentialRampToValueAtTime(0.28, now + 0.008);
+    thumpGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+    thump.connect(thumpGain).connect(context.destination);
+
+    const click = context.createOscillator();
+    const clickGain = context.createGain();
+    click.type = 'square';
+    click.frequency.setValueAtTime(190, now);
+    click.frequency.exponentialRampToValueAtTime(72, now + 0.035);
+    clickGain.gain.setValueAtTime(0.0001, now);
+    clickGain.gain.exponentialRampToValueAtTime(0.065, now + 0.004);
+    clickGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+    click.connect(clickGain).connect(context.destination);
+
+    thump.start(now);
+    click.start(now);
+    thump.stop(now + 0.21);
+    click.stop(now + 0.055);
+    if (context.state === 'suspended') void context.resume().catch(() => undefined);
+  } catch {
+    // Mantener el paso jugable aunque el navegador no tenga un dispositivo de audio disponible.
+  }
+}
+
 function attack(): void {
   attackCooldown = HORDE_BALANCE.attackCooldownSeconds;
   startCuecaMove('Zapateo');
+  playZapateoSound();
   zapateoVisualElapsed = 0;
   attackMarker.position.set(player.position.x, 0.08, player.position.z);
   attackMarker.scale.setScalar(HORDE_BALANCE.attackMarkerStartScale);
@@ -651,7 +696,8 @@ function getAttackDirection(step: CuecaStep): Vector2XZ | undefined {
 }
 
 function getEscobilladoRange(): number {
-  return HORDE_BALANCE.attackRange * (1 + upgradeLevels.escobillado * HORDE_BALANCE.escobilladoUpgradeRangeFactor);
+  return HORDE_BALANCE.attackRange * HORDE_BALANCE.escobilladoRangeMultiplier
+    * (1 + upgradeLevels.escobillado * HORDE_BALANCE.escobilladoUpgradeRangeFactor);
 }
 
 function getEscobilladoHalfAngle(): number {

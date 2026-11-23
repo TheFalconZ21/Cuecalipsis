@@ -7,7 +7,19 @@
     <title>Cuecalipsis · La plaza</title>
   </head>
   <body>
-    <div id="main-menu-root"></div>
+    <section id="opening-cinematic" class="opening-cinematic" role="region" aria-label="Cinemática de inicio de Cuecalipsis">
+      <video id="opening-video-first" class="opening-video" src="/cinematics/level-1-intro-01.mp4" autoplay muted playsinline preload="auto"></video>
+      <video id="opening-video-second" class="opening-video" src="/cinematics/level-1-intro-02.mp4" playsinline preload="auto" hidden></video>
+      <div class="opening-controls">
+        <p id="opening-status" class="opening-status" aria-live="polite">Cinemática · Parte 1 de 2</p>
+        <div class="opening-actions">
+          <button id="opening-play" type="button" hidden>Reproducir cinemática</button>
+          <button id="opening-audio" type="button" aria-pressed="false" disabled>Activar sonido</button>
+          <button id="opening-skip" type="button" disabled>Omitir cinemática</button>
+        </div>
+      </div>
+    </section>
+    <div id="main-menu-root" hidden></div>
     <main id="game-shell" class="combat-shell" hidden>
       <div id="viewport" class="viewport" aria-label="Prototipo jugable de combate"></div>
       <header class="topbar glass-panel">
@@ -58,6 +70,6 @@
       </footer>
       <div id="toast" class="toast" aria-live="polite"></div>
     </main>
-    <script type="module" src="/src/modules/art-vfx-ui/MainMenuEntry.ts"></script>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
