@@ -7,8 +7,9 @@ Estas decisiones reemplazan las recomendaciones anteriores que aparezcan en los 
 - Duración de cada corchea: `60 / BPM / 3` segundos.
 - En esta convención, el BPM de cada pista se expresa en negras con puntillo: tres corcheas por pulso.
 - Cada compás tiene seis corcheas, índices `0–5`; los pulsos fuertes son `0` y `3`.
-- Al inicio se integra una sola pista: cueca tradicional. El BPM concreto debe medirse/confirmarse contra el archivo de audio seleccionado y vivir en la configuración, no hardcodeado en el reloj.
-- Como referencia, el análisis de `La Rosa con el Clavel.mp3` dio aproximadamente `83–85 BPM` en negras con puntillo (`126–128 BPM` contando negras). Es una estimación; verificarla con el loop final antes de fijar el valor.
+- Al inicio se integra una sola pista: cueca tradicional, a `85 BPM` en negras con puntillo (`127.5 BPM` contando negras).
+- Con esa configuración, cada corchea dura `60 / 85 / 3 ≈ 0.2353 s`; los pulsos fuertes `0` y `3` quedan separados por tres corcheas.
+- El análisis de `La Rosa con el Clavel.mp3` estimó `83–85 BPM` en negras con puntillo; se fija `85 BPM` como valor inicial. El reloj lee el valor desde configuración, no lo hardcodea.
 
 ## Ataque básico y carga
 
@@ -32,6 +33,6 @@ Estas decisiones reemplazan las recomendaciones anteriores que aparezcan en los 
 
 ## Pendiente antes de integrar
 
-- Confirmar BPM exacto y punto de loop de la pista tradicional definitiva.
+- Confirmar el punto de loop de la pista tradicional definitiva y validar que el track mantenga los `85 BPM` acordados.
 - Acordar con Dev 3 cómo `OnEnemyDamaged`/`OnEnemyDestroyed` y con Dev 2 cómo `OnPropTrampled` alimentan la carga, mediante contratos de `src/core/`.
 - Definir valores de carga por daño/destrucción y escalado de crítico/bonus en la configuración compartida.
