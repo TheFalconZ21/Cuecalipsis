@@ -1,0 +1,57 @@
+.pause-menu {
+  --pause-paper: #eee4cf;
+  --pause-muted: #a69d89;
+  --pause-brass: #c5a566;
+  --pause-red: #b64d3f;
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--pause-paper);
+  font-family: "Avenir Next", Avenir, "Trebuchet MS", sans-serif;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--pause-duration) ease;
+}
+.pause-menu.is-visible { opacity: 1; pointer-events: auto; }
+.pause-menu::before { content: ""; position: absolute; inset: 0; background: rgba(8, 10, 11, .74); backdrop-filter: blur(4px); }
+.pause-menu__panel {
+  position: relative;
+  width: min(390px, calc(100vw - 32px));
+  padding: 31px 34px 24px;
+  border: 1px solid rgba(197, 165, 102, .78);
+  outline: 1px solid rgba(238, 228, 207, .13);
+  outline-offset: 5px;
+  background: linear-gradient(145deg, rgba(37, 39, 36, .98), rgba(22, 27, 28, .98));
+  box-shadow: 0 24px 75px #000b, inset 0 0 0 1px rgba(0, 0, 0, .4);
+  text-align: center;
+  transform: translateY(calc(-50vh - 120%));
+  transition: transform var(--panel-drop-duration) cubic-bezier(.16, .78, .22, 1);
+}
+.pause-menu__panel::before, .pause-menu__panel::after { content: ""; position: absolute; width: 11px; height: 11px; border-color: var(--pause-brass); border-style: solid; }
+.pause-menu__panel::before { top: 7px; left: 7px; border-width: 1px 0 0 1px; }
+.pause-menu__panel::after { right: 7px; bottom: 7px; border-width: 0 1px 1px 0; }
+.pause-menu.is-open .pause-menu__panel { transform: translateY(0); }
+.pause-menu__eyebrow { margin: 0 0 8px; color: var(--pause-brass); font-size: 9px; font-weight: 750; letter-spacing: .2em; }
+.pause-menu__panel h1 { margin: 0 0 21px; color: var(--pause-paper); font: 600 32px/1.1 Georgia, "Times New Roman", serif; letter-spacing: .01em; }
+.pause-menu__actions { display: grid; gap: 8px; }
+.pause-menu__button { width: 100%; min-height: 43px; border: 1px solid rgba(201, 184, 149, .26); background: rgba(12, 17, 18, .45); color: var(--pause-paper); font-family: inherit; font-size: 12px; font-weight: 600; line-height: 1.2; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease; }
+.pause-menu__button:hover, .pause-menu__button:focus-visible { border-color: var(--pause-brass); background: rgba(197, 165, 102, .12); color: #ffe9b5; outline: none; }
+.pause-menu__button--primary { border-color: rgba(197, 165, 102, .78); background: linear-gradient(90deg, rgba(137, 94, 53, .35), rgba(182, 77, 63, .22)); }
+.pause-menu__hint { margin: 18px 0 0; color: var(--pause-muted); font-size: 9px; font-weight: 700; letter-spacing: .12em; }
+.pause-menu__hint span { padding: 0 5px; color: var(--pause-brass); }
+.pause-menu__volume { display: flex; justify-content: space-between; margin: 3px 0 8px; color: var(--pause-paper); font-size: 11px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+.pause-menu__volume output { color: var(--pause-brass); font-variant-numeric: tabular-nums; }
+.pause-menu input[type="range"] { width: 100%; margin: 6px 0 5px; accent-color: var(--pause-brass); cursor: pointer; }
+.pause-menu__note { margin: 14px 0 19px; color: var(--pause-muted); font-size: 10px; }
+.pause-menu__panel--home h1 { margin-bottom: 0; }
+.pause-menu__panel--home .pause-menu__button { margin-top: 18px; }
+@media (max-width: 480px) {
+  .pause-menu__panel { padding: 26px 23px 20px; }
+  .pause-menu__panel h1 { font-size: 28px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pause-menu, .pause-menu__panel, .pause-menu__button { transition-duration: .01ms; }
+}

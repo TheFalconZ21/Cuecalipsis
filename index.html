@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#17120f" />
+    <title>Cuecalipsis · Fuerza pública</title>
+  </head>
+  <body>
+    <main class="combat-shell">
+      <div id="viewport" class="viewport" aria-label="Prototipo jugable de combate"></div>
+      <header class="topbar glass-panel">
+        <div class="brand-mark">C</div>
+        <div><p class="eyebrow">DEV 3 · COMBATE</p><h1>Fuerza pública <span>Horda 1</span></h1></div>
+        <div class="live-pill"><i></i> PROTOTIPO JUGABLE</div>
+      </header>
+      <aside class="combat-panel glass-panel">
+        <p class="eyebrow">SUPERVIVENCIA</p>
+        <h2 id="wave-label">Nivel 1</h2>
+        <p id="wave-count" class="wave-count">Oficiales derrotados: 0 / 15</p>
+        <div class="meter-heading"><span>Experiencia <b id="level-value">Nivel 1</b></span><strong id="experience-value">0 / 70</strong></div>
+        <div class="meter-track xp-track"><div id="experience-fill"></div></div>
+        <div class="meter-heading skill-heading"><span>Habilidad superior <b id="next-step-label">Zapateo</b></span><strong id="skill-value">0%</strong></div>
+        <div class="meter-track skill-track"><div id="skill-fill"></div></div>
+        <div class="health-label"><span>Salud</span><strong id="health-value">100 / 100</strong></div>
+        <div class="health-track"><div id="health-fill"></div></div>
+        <div class="upgrade-summary"><span id="zapateo-level">Zapateo base</span><span id="escobillado-level">Escobillado base</span></div>
+        <p id="buff-status" class="buff-status">Sin buffs activos</p>
+        <p id="status" class="status">Muévete, esquiva y baila para despejar la plaza.</p>
+        <button id="restart" class="restart" type="button">Reiniciar partida</button>
+      </aside>
+      <section id="level-up-overlay" class="level-up-overlay" hidden aria-modal="true" aria-labelledby="level-up-title">
+        <div class="level-up-card glass-panel">
+          <p class="eyebrow">NUEVA EXPERIENCIA</p>
+          <h2 id="level-up-title">¡Subiste al nivel <span id="choice-level">2</span>!</h2>
+          <p>Elige una mejora. La plaza se pausa mientras decides.</p>
+          <div id="upgrade-choices" class="upgrade-choices"></div>
+        </div>
+      </section>
+      <section id="sun-rhythm-overlay" class="sun-rhythm-overlay" hidden aria-labelledby="sun-rhythm-title">
+        <div class="sun-rhythm-card glass-panel">
+          <p class="eyebrow">ENCUENTRO · RITMO 6/8</p>
+          <h2 id="sun-rhythm-title">El Sol entra en la plaza</h2>
+          <p id="sun-rhythm-copy">Sigue los pulsos y toca cuando el círculo llegue al aro.</p>
+          <div class="sun-health"><span>Resonancia</span><strong id="sun-score">0 / 8</strong><div><i id="sun-health-fill"></i></div></div>
+          <div id="rhythm-lane" class="rhythm-lane" aria-label="Pista de ritmo"><div class="hit-line"></div><div id="rhythm-notes"></div></div>
+          <div class="rhythm-feedback" id="rhythm-feedback">Pulsa ESPACIO o toca la pista</div>
+          <button id="rhythm-hit" type="button">Tocar · ESPACIO</button>
+          <button id="rhythm-retry" class="rhythm-retry" type="button" hidden>Reintentar ritmo</button>
+        </div>
+      </section>
+      <footer class="controls glass-panel">
+        <span><kbd>W A S D</kbd> moverse</span><span><kbd>ESPACIO</kbd> zapateo radial</span><span><kbd>E</kbd> escobillado</span><span><kbd>Q</kbd> vuelta con escudo</span><span><kbd>SHIFT</kbd> esquivar</span>
+        <span>Recoge completos, sopaipillas y empanadas</span>
+        <span id="rhythm-note" class="rhythm-note">Ataques de prueba · integración del reloj 6/8 pendiente</span>
+      </footer>
+      <div id="toast" class="toast" aria-live="polite"></div>
+    </main>
+    <script type="module" src="/src/modules/combat-hordes/preview.ts"></script>
+  </body>
+</html>

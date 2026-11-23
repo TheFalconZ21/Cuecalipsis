@@ -16,8 +16,8 @@ No reducir ni expandir la cantidad de niveles de forma implícita. Mantener la c
 
 ### Resolución
 
-- Mapeo de cinco niveles a Tiers: _pendiente con Dev 2_
-- Aparición y progresión: _pendiente_
+- Mapeo de cinco niveles de hordas a cuatro Tiers: Tier 1 → horda 1; Tier 2 → horda 2; Tier 3 → horda 3; Tier 4 → hordas 4 y 5.
+- Aparición y progresión: prototipo de Horda 1 con tres enemigos en la primera oleada, +1 por oleada hasta nueve, cuatro enemigos simultáneos como máximo y 4,5 s de pausa al despejarla. Ajustes temporales editables en `HordeDirector.ts`; la progresión entre niveles 1–5 sigue pendiente.
 - Fodder al crecer: _pendiente_
 - Mapeo de jefes: _pendiente con Dev 2_
-- Responsable/fecha: _pendiente_
+- Responsable/fecha: Dev 3, 23-11-2026 (acuerdo comunicado por el usuario).
